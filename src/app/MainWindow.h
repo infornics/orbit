@@ -7,6 +7,8 @@ class QSplitter;
 class QStackedWidget;
 class QLabel;
 class QPushButton;
+class QAction;
+class QTimer;
 
 namespace Orbit {
 
@@ -33,6 +35,8 @@ private slots:
     bool onSaveFile();
     bool onSaveFileAs();
     void onCloseFile();
+    void onToggleAutoSave(bool checked);
+    void onAutoSaveTimeout();
     void onToggleSidebar();
     void onAbout();
 
@@ -69,10 +73,15 @@ private:
     QLabel *m_cursorPosLabel;
     QLabel *m_indentLabel;
 
+    // Actions & Timers
+    QAction *m_autoSaveAction;
+    QTimer *m_autoSaveTimer;
+
     // State
     QString m_currentFilePath;
     bool m_isDirty;
     bool m_isUntitled;
+    bool m_autoSaveEnabled;
     int m_untitledCounter;
 };
 

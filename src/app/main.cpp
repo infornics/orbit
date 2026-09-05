@@ -3,6 +3,8 @@
 #include "ui/Icons.h"
 
 #include <QApplication>
+#include <QMenuBar>
+#include <QMenu>
 #include <QFileInfo>
 #include <QDir>
 #include <QIcon>
@@ -30,6 +32,10 @@ int main(int argc, char *argv[]) {
     parser.addVersionOption();
     QCommandLineOption screenshotOption("screenshot", "Save window screenshot to file and exit", "file");
     parser.addOption(screenshotOption);
+    QCommandLineOption openMenuOption("open-menu", "Open specified menu before screenshot", "name");
+    parser.addOption(openMenuOption);
+    QCommandLineOption autoSaveOption("enable-autosave", "Enable autosave");
+    parser.addOption(autoSaveOption);
     parser.addPositionalArgument("path", "Initial file or directory to open", "[path]");
     parser.process(app);
 
@@ -45,11 +51,37 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if (parser.isSet(autoSaveOption)) {
+        for (auto *action : window.menuBar()->actions()) {
+            if (auto *menu = action->menu()) {
+                for (auto *item : menu->actions()) {
+                    if (item->text().contains("Auto Save")) {
+                        item->setChecked(true);
+                    }
+                }
+            }
+        }
+    }
+
     window.show();
 
     if (parser.isSet(screenshotOption)) {
         app.processEvents();
         const QString screenshotPath = parser.value(screenshotOption);
+        if (parser.isSet(openMenuOption)) {
+            const QString menuName = parser.value(openMenuOption);
+            for (auto *action : window.menuBar()->actions()) {
+                if (auto *menu = action->menu()) {
+                    if (menu->title().contains(menuName, Qt::CaseInsensitive)) {
+                        menu->show();
+                        app.processEvents();
+                        QPixmap menuPix = menu->grab();
+                        menuPix.save(screenshotPath);
+                        return 0;
+                    }
+                }
+            }
+        }
         QPixmap pixmap = window.grab();
         pixmap.save(screenshotPath);
         return 0;

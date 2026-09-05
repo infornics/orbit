@@ -7,5 +7,6 @@
         <file>icons/save.svg</file>
         <file>icons/plus.svg</file>
         <file>icons/close.svg</file>
+        <file>icons/check.svg</file>
     </qresource>
 </RCC>

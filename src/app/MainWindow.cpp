@@ -12,6 +12,8 @@
 #include <QStackedWidget>
 #include <QMenuBar>
 #include <QMenu>
+#include <QAction>
+#include <QTimer>
 #include <QStatusBar>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -43,14 +45,22 @@ MainWindow::MainWindow(QWidget *parent)
     , m_encodingLabel(nullptr)
     , m_cursorPosLabel(nullptr)
     , m_indentLabel(nullptr)
+    , m_autoSaveAction(nullptr)
+    , m_autoSaveTimer(nullptr)
     , m_isDirty(false)
     , m_isUntitled(false)
+    , m_autoSaveEnabled(false)
     , m_untitledCounter(0) {
 
     setObjectName("MainWindow");
     setWindowTitle("Orbit");
     setWindowIcon(Icons::orbit(32));
     resize(1100, 720);
+
+    m_autoSaveTimer = new QTimer(this);
+    m_autoSaveTimer->setSingleShot(true);
+    m_autoSaveTimer->setInterval(1000);
+    connect(m_autoSaveTimer, &QTimer::timeout, this, &MainWindow::onAutoSaveTimeout);
 
     setupUi();
     createMenus();
@@ -233,13 +243,20 @@ void MainWindow::createMenus() {
     // --- File Menu ---
     auto *fileMenu = menuBar()->addMenu(tr("&File"));
 
-    fileMenu->addAction(Icons::plus(16), tr("&New File"), QKeySequence::New, this, &MainWindow::onNewFile);
-    fileMenu->addAction(Icons::file(16), tr("&Open File..."), QKeySequence::Open, this, &MainWindow::onOpenFile);
-    fileMenu->addAction(Icons::folderOpen(16), tr("Open &Folder..."), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_O), this, &MainWindow::onOpenFolder);
+    fileMenu->addAction(tr("&New File"), QKeySequence::New, this, &MainWindow::onNewFile);
+    fileMenu->addAction(tr("&Open File..."), QKeySequence::Open, this, &MainWindow::onOpenFile);
+    fileMenu->addAction(tr("Open &Folder..."), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_O), this, &MainWindow::onOpenFolder);
     fileMenu->addSeparator();
 
-    fileMenu->addAction(Icons::save(16), tr("&Save"), QKeySequence::Save, this, &MainWindow::onSaveFile);
+    fileMenu->addAction(tr("&Save"), QKeySequence::Save, this, &MainWindow::onSaveFile);
     fileMenu->addAction(tr("Save &As..."), QKeySequence::SaveAs, this, &MainWindow::onSaveFileAs);
+    fileMenu->addSeparator();
+
+    m_autoSaveAction = fileMenu->addAction(tr("&Auto Save"), this, &MainWindow::onToggleAutoSave);
+    m_autoSaveAction->setCheckable(true);
+    m_autoSaveAction->setChecked(m_autoSaveEnabled);
+    fileMenu->addSeparator();
+
     fileMenu->addAction(tr("&Close File"), QKeySequence::Close, this, &MainWindow::onCloseFile);
     fileMenu->addSeparator();
 
@@ -293,6 +310,10 @@ void MainWindow::updateTitleAndHeader() {
 
 bool MainWindow::maybeSave() {
     if (!m_isDirty) return true;
+
+    if (m_autoSaveEnabled && !m_isUntitled && !m_currentFilePath.isEmpty()) {
+        return saveToFile(m_currentFilePath);
+    }
 
     QString displayName = m_isUntitled ? m_currentFilePath : QFileInfo(m_currentFilePath).fileName();
     const auto button = QMessageBox::warning(
@@ -479,6 +500,34 @@ void MainWindow::onDocumentModified() {
         updateTitleAndHeader();
         m_statusMsgLabel->setText(tr("Modified"));
     }
+
+    if (m_autoSaveEnabled && !m_isUntitled && !m_currentFilePath.isEmpty()) {
+        m_autoSaveTimer->start(1000);
+    }
+}
+
+void MainWindow::onToggleAutoSave(bool checked) {
+    m_autoSaveEnabled = checked;
+    if (m_autoSaveEnabled) {
+        m_statusMsgLabel->setText(tr("Auto Save enabled"));
+        if (m_isDirty && !m_isUntitled && !m_currentFilePath.isEmpty()) {
+            m_autoSaveTimer->start(500);
+        }
+    } else {
+        if (m_autoSaveTimer) {
+            m_autoSaveTimer->stop();
+        }
+        m_statusMsgLabel->setText(tr("Auto Save disabled"));
+    }
+    saveSettings();
+}
+
+void MainWindow::onAutoSaveTimeout() {
+    if (m_autoSaveEnabled && m_isDirty && !m_isUntitled && !m_currentFilePath.isEmpty()) {
+        if (saveToFile(m_currentFilePath)) {
+            m_statusMsgLabel->setText(tr("Auto-saved"));
+        }
+    }
 }
 
 void MainWindow::onCursorLocationChanged(int line, int col) {
@@ -512,6 +561,11 @@ void MainWindow::loadSettings() {
     if (!lastFolder.isEmpty() && QDir(lastFolder).exists()) {
         openFolder(lastFolder);
     }
+
+    m_autoSaveEnabled = settings.value("autoSave", false).toBool();
+    if (m_autoSaveAction) {
+        m_autoSaveAction->setChecked(m_autoSaveEnabled);
+    }
 }
 
 void MainWindow::saveSettings() {
@@ -522,9 +576,14 @@ void MainWindow::saveSettings() {
     if (!m_explorerPanel->currentFolderPath().isEmpty()) {
         settings.setValue("lastFolder", m_explorerPanel->currentFolderPath());
     }
+
+    settings.setValue("autoSave", m_autoSaveEnabled);
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
+    if (m_autoSaveTimer && m_autoSaveTimer->isActive()) {
+        m_autoSaveTimer->stop();
+    }
     if (maybeSave()) {
         saveSettings();
         event->accept();

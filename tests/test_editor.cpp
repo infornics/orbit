@@ -22,6 +22,7 @@ private slots:
     void testDirtyStateAndScreenshot();
     void testExplorerFolderSingleClickExpand();
     void testSyntaxHighlighter();
+    void testAutoSave();
 };
 
 void OrbitTests::testCodeEditorTabAndIndent() {
@@ -241,6 +242,41 @@ void OrbitTests::testSyntaxHighlighter() {
     QTest::qWait(100);
     QPixmap tsPixmap = window.grab();
     tsPixmap.save("/home/rachit/.gemini/antigravity-ide/brain/b746bfe9-4557-459b-a6f6-33d305091097/typescript_syntax_demo.png");
+}
+
+void OrbitTests::testAutoSave() {
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    QString filePath = tempDir.filePath("autosave_test.txt");
+    {
+        QFile file(filePath);
+        QVERIFY(file.open(QFile::WriteOnly | QFile::Text));
+        QTextStream out(&file);
+        out << "Version 1";
+    }
+
+    MainWindow window;
+    QVERIFY(window.openFile(filePath));
+
+    // Enable Auto Save
+    QMetaObject::invokeMethod(&window, "onToggleAutoSave", Q_ARG(bool, true));
+
+    auto *editor = window.findChild<CodeEditor*>();
+    QVERIFY(editor != nullptr);
+    editor->setPlainText("Version 2 Auto Saved");
+
+    // Wait for auto save debounce (1000ms + margin)
+    QTest::qWait(1300);
+
+    // Verify file content on disk has updated
+    QFile verifyFile(filePath);
+    QVERIFY(verifyFile.open(QFile::ReadOnly | QFile::Text));
+    QTextStream in(&verifyFile);
+    QCOMPARE(in.readAll(), QString("Version 2 Auto Saved"));
+
+    // Verify window dirty status is false
+    QVERIFY(!window.windowTitle().contains("•"));
 }
 
 QTEST_MAIN(OrbitTests)

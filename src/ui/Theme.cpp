@@ -109,7 +109,7 @@ QString Theme::applicationStyleSheet() {
             padding: 4px;
         }
         QMenu::item {
-            padding: 6px 24px 6px 12px;
+            padding: 6px 24px 6px 26px;
             border-radius: 4px;
         }
         QMenu::item:selected {
