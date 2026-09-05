@@ -203,6 +203,9 @@ void MainWindow::setupUi() {
     // --- Page 1: Code Editor ---
     m_editor = new CodeEditor(m_editorStack);
     connect(m_editor, &QPlainTextEdit::textChanged, this, &MainWindow::onDocumentModified);
+    connect(m_editor->document(), &QTextDocument::modificationChanged, this, [this](bool) {
+        onDocumentModified();
+    });
     connect(m_editor, &CodeEditor::cursorLocationChanged, this, &MainWindow::onCursorLocationChanged);
     connect(m_editor, &CodeEditor::languageChanged, this, [this](const QString &name) {
         if (m_languageLabel) {
@@ -316,21 +319,31 @@ bool MainWindow::maybeSave() {
     }
 
     QString displayName = m_isUntitled ? m_currentFilePath : QFileInfo(m_currentFilePath).fileName();
-    const auto button = QMessageBox::warning(
-        this,
-        tr("Unsaved Changes"),
-        tr("Do you want to save changes to '%1'?").arg(displayName),
-        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
-        QMessageBox::Save
-    );
 
-    if (button == QMessageBox::Save) {
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle(tr("Unsaved Changes — Orbit"));
+    msgBox.setText(tr("Do you want to save changes to '%1'?").arg(displayName));
+    msgBox.setInformativeText(tr("Your changes will be lost if you don't save them."));
+    msgBox.setIcon(QMessageBox::NoIcon);
+
+    QPushButton *saveBtn = msgBox.addButton(tr("Save"), QMessageBox::AcceptRole);
+    QPushButton *discardBtn = msgBox.addButton(tr("Don't Save"), QMessageBox::DestructiveRole);
+    QPushButton *cancelBtn = msgBox.addButton(tr("Cancel"), QMessageBox::RejectRole);
+
+    msgBox.setDefaultButton(saveBtn);
+    saveBtn->setIcon(QIcon());
+    discardBtn->setIcon(QIcon());
+    cancelBtn->setIcon(QIcon());
+
+    msgBox.exec();
+
+    if (msgBox.clickedButton() == saveBtn) {
         return onSaveFile();
-    } else if (button == QMessageBox::Cancel) {
+    } else if (msgBox.clickedButton() == cancelBtn) {
         return false;
     }
 
-    return true; // Discard
+    return true; // Discard / Don't Save
 }
 
 void MainWindow::onNewFile() {
@@ -338,9 +351,11 @@ void MainWindow::onNewFile() {
 
     m_isUntitled = true;
     m_currentFilePath = tr("Untitled-%1").arg(++m_untitledCounter);
+    m_savedContent.clear();
     m_isDirty = false;
 
     m_editor->clear();
+    m_editor->document()->setModified(false);
     m_editor->setFilePath(QString());
     m_editorStack->setCurrentIndex(1);
     m_fileHeaderBar->show();
@@ -377,8 +392,13 @@ bool MainWindow::openFile(const QString &filePath) {
 
     QFile file(filePath);
     if (!file.open(QFile::ReadOnly | QFile::Text)) {
-        QMessageBox::warning(this, tr("Orbit — Error"),
-                             tr("Cannot open file %1:\n%2.").arg(filePath, file.errorString()));
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(tr("Error — Orbit"));
+        msgBox.setText(tr("Cannot open file %1:\n%2.").arg(filePath, file.errorString()));
+        msgBox.setIcon(QMessageBox::NoIcon);
+        auto *okBtn = msgBox.addButton(tr("OK"), QMessageBox::AcceptRole);
+        okBtn->setIcon(QIcon());
+        msgBox.exec();
         return false;
     }
 
@@ -390,6 +410,8 @@ bool MainWindow::openFile(const QString &filePath) {
     m_editor->setPlainText(content);
     m_editor->setFilePath(filePath);
     m_currentFilePath = filePath;
+    m_savedContent = content;
+    m_editor->document()->setModified(false);
     m_isDirty = false;
     m_isUntitled = false;
 
@@ -453,18 +475,26 @@ bool MainWindow::onSaveFileAs() {
 bool MainWindow::saveToFile(const QString &filePath) {
     QFile file(filePath);
     if (!file.open(QFile::WriteOnly | QFile::Text)) {
-        QMessageBox::warning(this, tr("Orbit — Error"),
-                             tr("Cannot save file %1:\n%2.").arg(filePath, file.errorString()));
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(tr("Error — Orbit"));
+        msgBox.setText(tr("Cannot save file %1:\n%2.").arg(filePath, file.errorString()));
+        msgBox.setIcon(QMessageBox::NoIcon);
+        auto *okBtn = msgBox.addButton(tr("OK"), QMessageBox::AcceptRole);
+        okBtn->setIcon(QIcon());
+        msgBox.exec();
         return false;
     }
 
+    const QString content = m_editor->toPlainText();
     QTextStream out(&file);
     out.setEncoding(QStringConverter::Utf8);
-    out << m_editor->toPlainText();
+    out << content;
     file.close();
 
     m_currentFilePath = filePath;
     m_editor->setFilePath(filePath);
+    m_savedContent = content;
+    m_editor->document()->setModified(false);
     m_isDirty = false;
     m_isUntitled = false;
 
@@ -474,9 +504,14 @@ bool MainWindow::saveToFile(const QString &filePath) {
 }
 
 void MainWindow::onCloseFile() {
+    if (m_autoSaveTimer && m_autoSaveTimer->isActive()) {
+        m_autoSaveTimer->stop();
+    }
     if (!maybeSave()) return;
 
     m_currentFilePath.clear();
+    m_savedContent.clear();
+    m_editor->document()->setModified(false);
     m_isDirty = false;
     m_isUntitled = false;
 
@@ -495,13 +530,27 @@ void MainWindow::onToggleSidebar() {
 void MainWindow::onDocumentModified() {
     if (m_editorStack->currentIndex() != 1) return;
 
-    if (!m_isDirty) {
-        m_isDirty = true;
-        updateTitleAndHeader();
-        m_statusMsgLabel->setText(tr("Modified"));
+    bool nowDirty = false;
+    if (m_isUntitled) {
+        nowDirty = !m_editor->toPlainText().isEmpty();
+    } else {
+        nowDirty = (m_editor->toPlainText() != m_savedContent);
     }
 
-    if (m_autoSaveEnabled && !m_isUntitled && !m_currentFilePath.isEmpty()) {
+    if (nowDirty != m_isDirty) {
+        m_isDirty = nowDirty;
+        updateTitleAndHeader();
+        if (m_isDirty) {
+            m_statusMsgLabel->setText(tr("Modified"));
+        } else {
+            m_statusMsgLabel->setText(tr("Ready"));
+            if (m_autoSaveTimer && m_autoSaveTimer->isActive()) {
+                m_autoSaveTimer->stop();
+            }
+        }
+    }
+
+    if (m_isDirty && m_autoSaveEnabled && !m_isUntitled && !m_currentFilePath.isEmpty()) {
         m_autoSaveTimer->start(1000);
     }
 }
@@ -535,13 +584,15 @@ void MainWindow::onCursorLocationChanged(int line, int col) {
 }
 
 void MainWindow::onAbout() {
-    QMessageBox::about(
-        this,
-        tr("About Orbit"),
-        tr("<h3>Orbit 0.1.0</h3>"
-           "<p>A fast, focused, and elegant native code and text editor built with C++20 and Qt 6.</p>"
-           "<p>Designed for distraction-free editing on Linux.</p>")
-    );
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle(tr("About Orbit"));
+    msgBox.setIconPixmap(Icons::orbit(48).pixmap(48, 48));
+    msgBox.setText(tr("<h3>Orbit 0.1.0</h3>"
+                      "<p>A fast, focused, and elegant native code and text editor built with C++20 and Qt 6.</p>"
+                      "<p>Designed for distraction-free editing on Linux.</p>"));
+    auto *okBtn = msgBox.addButton(tr("OK"), QMessageBox::AcceptRole);
+    okBtn->setIcon(QIcon());
+    msgBox.exec();
 }
 
 void MainWindow::loadSettings() {

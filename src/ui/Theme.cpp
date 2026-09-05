@@ -254,12 +254,46 @@ QString Theme::applicationStyleSheet() {
 
         /* Dialogs / Message Boxes */
         QMessageBox {
-            background-color: #1a1a20;
+            background-color: #1c1c24;
             color: #eaeaf0;
+            border: 1px solid #2e2e3a;
+            border-radius: 8px;
         }
         QMessageBox QLabel {
             color: #eaeaf0;
             font-size: 13px;
+            background: transparent;
+        }
+        QMessageBox QLabel#qt_msgbox_informativelabel {
+            color: #9292a4;
+            font-size: 12px;
+        }
+        QMessageBox QPushButton {
+            background-color: #262632;
+            color: #eaeaf0;
+            border: 1px solid #3c3c4c;
+            border-radius: 5px;
+            padding: 6px 18px;
+            min-width: 75px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        QMessageBox QPushButton:hover {
+            background-color: #323242;
+            border-color: #4f8cf6;
+            color: #ffffff;
+        }
+        QMessageBox QPushButton:pressed {
+            background-color: #20202a;
+        }
+        QMessageBox QPushButton:default {
+            background-color: #3b74db;
+            border-color: #4f8cf6;
+            color: #ffffff;
+        }
+        QMessageBox QPushButton:default:hover {
+            background-color: #4f8cf6;
+            border-color: #6ba0f8;
         }
     )");
 }

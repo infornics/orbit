@@ -79,6 +79,7 @@ private:
 
     // State
     QString m_currentFilePath;
+    QString m_savedContent;
     bool m_isDirty;
     bool m_isUntitled;
     bool m_autoSaveEnabled;

@@ -23,6 +23,8 @@ private slots:
     void testExplorerFolderSingleClickExpand();
     void testSyntaxHighlighter();
     void testAutoSave();
+    void testUnsavedChangesDialog();
+    void testRevertChangesClearsModified();
 };
 
 void OrbitTests::testCodeEditorTabAndIndent() {
@@ -119,6 +121,24 @@ void OrbitTests::testDirtyStateAndScreenshot() {
 
     QPixmap pixmap = window.grab();
     pixmap.save("/home/rachit/.gemini/antigravity-ide/brain/bea66796-e0e5-469a-9a79-cff795234df2/orbit_dirty.png");
+
+    // Revert edit with undo
+    editor->undo();
+    QTest::qWait(100);
+    QVERIFY(!window.windowTitle().contains("•"));
+
+    // Revert edit manually (typing and then deleting)
+    cursor.movePosition(QTextCursor::Start);
+    cursor.insertText("xyz");
+    QTest::qWait(100);
+    QVERIFY(window.windowTitle().contains("•"));
+
+    cursor.movePosition(QTextCursor::Start);
+    for (int i = 0; i < 3; ++i) {
+        cursor.deleteChar();
+    }
+    QTest::qWait(100);
+    QVERIFY(!window.windowTitle().contains("•"));
 }
 
 void OrbitTests::testExplorerFolderSingleClickExpand() {
@@ -276,6 +296,75 @@ void OrbitTests::testAutoSave() {
     QCOMPARE(in.readAll(), QString("Version 2 Auto Saved"));
 
     // Verify window dirty status is false
+    QVERIFY(!window.windowTitle().contains("•"));
+}
+
+void OrbitTests::testUnsavedChangesDialog() {
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    QString filePath = tempDir.filePath("package.json");
+    {
+        QFile file(filePath);
+        QVERIFY(file.open(QFile::WriteOnly | QFile::Text));
+        file.write("{\n  \"name\": \"orbit\"\n}\n");
+    }
+
+    MainWindow window;
+    window.resize(900, 600);
+    window.show();
+    QVERIFY(window.openFile(filePath));
+
+    auto *editor = window.findChild<CodeEditor*>();
+    QVERIFY(editor != nullptr);
+    editor->insertPlainText(" "); // Make dirty
+
+    // Schedule screenshot & dismiss via Cancel
+    QTimer::singleShot(300, [&]() {
+        QWidget *modal = QApplication::activeModalWidget();
+        if (modal) {
+            QPixmap pix = modal->grab();
+            pix.save("/home/rachit/.gemini/antigravity-ide/brain/b746bfe9-4557-459b-a6f6-33d305091097/unsaved_changes_clean.png");
+            modal->close();
+        }
+    });
+
+    window.close();
+}
+
+void OrbitTests::testRevertChangesClearsModified() {
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    QString filePath = tempDir.filePath("revert_test.txt");
+    {
+        QFile file(filePath);
+        QVERIFY(file.open(QFile::WriteOnly | QFile::Text));
+        QTextStream out(&file);
+        out << "Hello World";
+    }
+
+    MainWindow window;
+    QVERIFY(window.openFile(filePath));
+    QVERIFY(!window.windowTitle().contains("•"));
+
+    auto *editor = window.findChild<CodeEditor*>();
+    QVERIFY(editor != nullptr);
+
+    // 1. Edit via typing
+    editor->insertPlainText(" Extra");
+    QVERIFY(window.windowTitle().contains("•"));
+
+    // 2. Undo revert
+    editor->undo();
+    QCOMPARE(editor->toPlainText(), QString("Hello World"));
+    QVERIFY(!window.windowTitle().contains("•"));
+
+    // 3. Manual typing revert (type and then backspace)
+    editor->insertPlainText("!");
+    QVERIFY(window.windowTitle().contains("•"));
+    QTextCursor c = editor->textCursor();
+    c.deletePreviousChar();
+    editor->setTextCursor(c);
+    QCOMPARE(editor->toPlainText(), QString("Hello World"));
     QVERIFY(!window.windowTitle().contains("•"));
 }
 

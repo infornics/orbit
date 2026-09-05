@@ -5,6 +5,8 @@
 #include <QApplication>
 #include <QMenuBar>
 #include <QMenu>
+#include <QMessageBox>
+#include <QPushButton>
 #include <QFileInfo>
 #include <QDir>
 #include <QIcon>
@@ -36,6 +38,8 @@ int main(int argc, char *argv[]) {
     parser.addOption(openMenuOption);
     QCommandLineOption autoSaveOption("enable-autosave", "Enable autosave");
     parser.addOption(autoSaveOption);
+    QCommandLineOption showDialogOption("show-unsaved-dialog", "Show unsaved dialog for screenshot");
+    parser.addOption(showDialogOption);
     parser.addPositionalArgument("path", "Initial file or directory to open", "[path]");
     parser.process(app);
 
@@ -64,6 +68,31 @@ int main(int argc, char *argv[]) {
     }
 
     window.show();
+
+    if (parser.isSet(showDialogOption)) {
+        QMessageBox msgBox(&window);
+        msgBox.setWindowTitle("Unsaved Changes — Orbit");
+        msgBox.setText(QObject::tr("Do you want to save changes to 'package.json'?"));
+        msgBox.setInformativeText(QObject::tr("Your changes will be lost if you don't save them."));
+        msgBox.setIcon(QMessageBox::NoIcon);
+
+        QPushButton *saveBtn = msgBox.addButton(QObject::tr("Save"), QMessageBox::AcceptRole);
+        QPushButton *discardBtn = msgBox.addButton(QObject::tr("Don't Save"), QMessageBox::DestructiveRole);
+        QPushButton *cancelBtn = msgBox.addButton(QObject::tr("Cancel"), QMessageBox::RejectRole);
+
+        msgBox.setDefaultButton(saveBtn);
+        saveBtn->setIcon(QIcon());
+        discardBtn->setIcon(QIcon());
+        cancelBtn->setIcon(QIcon());
+
+        msgBox.show();
+        app.processEvents();
+        if (parser.isSet(screenshotOption)) {
+            QPixmap pix = msgBox.grab();
+            pix.save(parser.value(screenshotOption));
+            return 0;
+        }
+    }
 
     if (parser.isSet(screenshotOption)) {
         app.processEvents();
