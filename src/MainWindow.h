@@ -66,6 +66,7 @@ private:
 
     // Status bar labels
     QLabel *m_statusMsgLabel;
+    QLabel *m_languageLabel;
     QLabel *m_encodingLabel;
     QLabel *m_cursorPosLabel;
     QLabel *m_indentLabel;

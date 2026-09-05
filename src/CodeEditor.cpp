@@ -1,6 +1,7 @@
 #include "CodeEditor.h"
 #include "LineNumberArea.h"
 #include "Theme.h"
+#include "SyntaxHighlighter.h"
 
 #include <QPainter>
 #include <QTextBlock>
@@ -13,6 +14,7 @@ namespace Orbit {
 CodeEditor::CodeEditor(QWidget *parent)
     : QPlainTextEdit(parent)
     , m_lineNumberArea(new LineNumberArea(this))
+    , m_highlighter(new SyntaxHighlighter(document()))
     , m_baseFontSize(11)
     , m_currentFontSize(11) {
 
@@ -37,6 +39,9 @@ CodeEditor::CodeEditor(QWidget *parent)
     connect(this, &CodeEditor::updateRequest, this, &CodeEditor::updateLineNumberArea);
     connect(this, &CodeEditor::cursorPositionChanged, this, &CodeEditor::highlightCurrentLine);
     connect(this, &CodeEditor::cursorPositionChanged, this, &CodeEditor::onCursorPositionChanged);
+    connect(m_highlighter, &SyntaxHighlighter::languageChanged, this, [this](Language /*lang*/, const QString &name) {
+        emit languageChanged(name);
+    });
 
     updateLineNumberAreaWidth(0);
     highlightCurrentLine();
@@ -123,6 +128,23 @@ int CodeEditor::editorFontSize() const {
 
 void CodeEditor::resetEditorFontSize() {
     setEditorFontSize(m_baseFontSize);
+}
+
+void CodeEditor::setFilePath(const QString &filePath) {
+    if (m_highlighter) {
+        m_highlighter->setLanguageByFileName(filePath);
+    }
+}
+
+QString CodeEditor::currentLanguageName() const {
+    if (m_highlighter) {
+        return SyntaxHighlighter::languageName(m_highlighter->language());
+    }
+    return QStringLiteral("Plain Text");
+}
+
+SyntaxHighlighter* CodeEditor::highlighter() const {
+    return m_highlighter;
 }
 
 void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event) {

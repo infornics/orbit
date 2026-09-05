@@ -3,10 +3,12 @@
 #include "MainWindow.h"
 #include "ExplorerPanel.h"
 #include "Theme.h"
+#include "SyntaxHighlighter.h"
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTreeView>
 #include <QFileSystemModel>
+#include <QLabel>
 
 using namespace Orbit;
 
@@ -19,6 +21,7 @@ private slots:
     void testMainWindowOpenAndSave();
     void testDirtyStateAndScreenshot();
     void testExplorerFolderSingleClickExpand();
+    void testSyntaxHighlighter();
 };
 
 void OrbitTests::testCodeEditorTabAndIndent() {
@@ -170,6 +173,74 @@ void OrbitTests::testExplorerFolderSingleClickExpand() {
 
     // Verify it collapsed
     QVERIFY(!treeView->isExpanded(folderIndex));
+}
+
+void OrbitTests::testSyntaxHighlighter() {
+    // 1. Test language detection
+    QCOMPARE(SyntaxHighlighter::detectLanguage("index.ts"), Language::TypeScript);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("Component.tsx"), Language::TypeScript);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("server.js"), Language::JavaScript);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("main.cpp"), Language::Cpp);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("header.hpp"), Language::Cpp);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("script.py"), Language::Python);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("package.json"), Language::Json);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("index.html"), Language::Xml);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("resources.qrc"), Language::Xml);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("styles.css"), Language::Css);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("README.md"), Language::Markdown);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("deploy.yaml"), Language::Yaml);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("build.sh"), Language::Bash);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("CMakeLists.txt"), Language::CMake);
+    QCOMPARE(SyntaxHighlighter::detectLanguage("notes.txt"), Language::None);
+
+    // 2. Test language names
+    QCOMPARE(SyntaxHighlighter::languageName(Language::TypeScript), QString("TypeScript"));
+    QCOMPARE(SyntaxHighlighter::languageName(Language::Cpp), QString("C++"));
+    QCOMPARE(SyntaxHighlighter::languageName(Language::Python), QString("Python"));
+    QCOMPARE(SyntaxHighlighter::languageName(Language::None), QString("Plain Text"));
+
+    // 3. Test CodeEditor highlighting
+    CodeEditor editor;
+    editor.setFilePath("index.ts");
+    QCOMPARE(editor.currentLanguageName(), QString("TypeScript"));
+
+    editor.setPlainText("import dns from \"dns\";\n// Comment\nconst port = 8000;");
+    QTextBlock block0 = editor.document()->firstBlock();
+    QList<QTextLayout::FormatRange> formats0 = block0.layout()->formats();
+    QVERIFY(!formats0.isEmpty());
+
+    // 4. Test MainWindow integration with CMake
+    MainWindow window;
+    window.resize(1100, 720);
+    window.show();
+    QVERIFY(window.openFile("/home/rachit/Documents/Code/Infornics/Marketplace/Orbit/CMakeLists.txt"));
+    QTest::qWait(100);
+
+    QPixmap pixmap = window.grab();
+    pixmap.save("/home/rachit/.gemini/antigravity-ide/brain/b746bfe9-4557-459b-a6f6-33d305091097/syntax_highlighting_demo.png");
+
+    // 5. Test TypeScript file highlighting
+    QTemporaryFile tsFile(QDir::temp().filePath("index.XXXXXX.ts"));
+    QVERIFY(tsFile.open());
+    {
+        QTextStream out(&tsFile);
+        out << "import dns from \"dns\";\n"
+            << "dns.setServers([\"8.8.8.8\", \"8.8.4.4\"]);\n\n"
+            << "import express from 'express';\n"
+            << "import dotenv from 'dotenv';\n"
+            << "import cors from 'cors';\n\n"
+            << "// Server Port\n"
+            << "const port: number = 8000;\n"
+            << "app.get('/health', (req, res) => {\n"
+            << "    res.status(200).json({ success: true, message: 'Server is running' });\n"
+            << "});\n";
+    }
+    tsFile.close();
+
+    QVERIFY(window.openFile(tsFile.fileName()));
+    QTest::qWait(100);
+    QPixmap tsPixmap = window.grab();
+    tsPixmap.save("/home/rachit/.gemini/antigravity-ide/brain/b746bfe9-4557-459b-a6f6-33d305091097/typescript_syntax_demo.png");
 }
 
 QTEST_MAIN(OrbitTests)

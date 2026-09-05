@@ -1,7 +1,6 @@
 #include "MainWindow.h"
 #include "ExplorerPanel.h"
 #include "CodeEditor.h"
-#include "Theme.h"
 #include "Icons.h"
 
 #include <QApplication>
@@ -42,6 +41,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_welcomeWidget(nullptr)
     , m_editor(nullptr)
     , m_statusMsgLabel(nullptr)
+    , m_languageLabel(nullptr)
     , m_encodingLabel(nullptr)
     , m_cursorPosLabel(nullptr)
     , m_indentLabel(nullptr)
@@ -235,6 +235,11 @@ void MainWindow::setupUi() {
     m_editor = new CodeEditor(m_editorStack);
     connect(m_editor, &QPlainTextEdit::textChanged, this, &MainWindow::onDocumentModified);
     connect(m_editor, &CodeEditor::cursorLocationChanged, this, &MainWindow::onCursorLocationChanged);
+    connect(m_editor, &CodeEditor::languageChanged, this, [this](const QString &name) {
+        if (m_languageLabel) {
+            m_languageLabel->setText(name);
+        }
+    });
 
     m_editorStack->addWidget(m_editor);
     editorLayout->addWidget(m_editorStack);
@@ -251,11 +256,13 @@ void MainWindow::setupUi() {
     // Status Bar
     auto *status = statusBar();
     m_statusMsgLabel = new QLabel(tr("Ready"), this);
+    m_languageLabel = new QLabel(tr("Plain Text"), this);
     m_encodingLabel = new QLabel(tr("UTF-8 · LF"), this);
     m_cursorPosLabel = new QLabel(tr("Ln 1, Col 1"), this);
     m_indentLabel = new QLabel(tr("Spaces: 4"), this);
 
     status->addWidget(m_statusMsgLabel, 1);
+    status->addPermanentWidget(m_languageLabel);
     status->addPermanentWidget(m_encodingLabel);
     status->addPermanentWidget(m_indentLabel);
     status->addPermanentWidget(m_cursorPosLabel);
@@ -354,6 +361,7 @@ void MainWindow::onNewFile() {
     m_isDirty = false;
 
     m_editor->clear();
+    m_editor->setFilePath(QString());
     m_editorStack->setCurrentIndex(1);
     m_fileHeaderBar->show();
     updateTitleAndHeader();
@@ -400,6 +408,7 @@ bool MainWindow::openFile(const QString &filePath) {
     file.close();
 
     m_editor->setPlainText(content);
+    m_editor->setFilePath(filePath);
     m_currentFilePath = filePath;
     m_isDirty = false;
     m_isUntitled = false;
@@ -475,6 +484,7 @@ bool MainWindow::saveToFile(const QString &filePath) {
     file.close();
 
     m_currentFilePath = filePath;
+    m_editor->setFilePath(filePath);
     m_isDirty = false;
     m_isUntitled = false;
 
@@ -491,6 +501,7 @@ void MainWindow::onCloseFile() {
     m_isUntitled = false;
 
     m_editor->clear();
+    m_editor->setFilePath(QString());
     m_editorStack->setCurrentIndex(0);
     m_fileHeaderBar->hide();
     updateTitleAndHeader();

@@ -17,6 +17,8 @@ set(PROJECT_SOURCES
     src/ExplorerPanel.cpp
     src/CodeEditor.h
     src/CodeEditor.cpp
+    src/SyntaxHighlighter.h
+    src/SyntaxHighlighter.cpp
     src/LineNumberArea.h
     src/LineNumberArea.cpp
     src/Icons.h
@@ -51,6 +53,8 @@ if(Qt6Test_FOUND)
         src/ExplorerPanel.cpp
         src/CodeEditor.h
         src/CodeEditor.cpp
+        src/SyntaxHighlighter.h
+        src/SyntaxHighlighter.cpp
         src/LineNumberArea.h
         src/LineNumberArea.cpp
         src/Icons.h
