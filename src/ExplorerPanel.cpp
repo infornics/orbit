@@ -1,5 +1,4 @@
 #include "ExplorerPanel.h"
-#include "Theme.h"
 #include "Icons.h"
 
 #include <QVBoxLayout>
@@ -82,8 +81,7 @@ void ExplorerTreeView::drawRow(QPainter *painter, const QStyleOptionViewItem &op
         } else {
             painter->setBrush(QColor(0x22, 0x22, 0x29));
         }
-
-        QRect rowHighlight(4, options.rect.top() + 1, viewport()->width() - 8, options.rect.height() - 2);
+        QRect rowHighlight(2, options.rect.top() + 1, viewport()->width() - 4, options.rect.height() - 2);
         painter->drawRoundedRect(rowHighlight, 4, 4);
         painter->restore();
     }
@@ -120,8 +118,7 @@ void ExplorerTreeView::drawBranches(QPainter *painter, const QRect &rect, const 
 
     int ind = indentation();
     int arrowAreaLeft = rect.right() - ind + 1;
-    int arrowAreaRight = rect.right();
-    int centerX = (arrowAreaLeft + arrowAreaRight) / 2;
+    int centerX = arrowAreaLeft + ind / 2 + 1;
     int centerY = rect.top() + rect.height() / 2;
 
     bool isSelected = selectionModel() && selectionModel()->isSelected(index);
@@ -270,7 +267,7 @@ void ExplorerPanel::setupUi() {
     m_treeView->setModel(m_model);
     m_treeView->setHeaderHidden(true);
     m_treeView->setAnimated(true);
-    m_treeView->setIndentation(16);
+    m_treeView->setIndentation(20);
     m_treeView->setUniformRowHeights(true);
     m_treeView->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
