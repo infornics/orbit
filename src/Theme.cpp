@@ -146,28 +146,24 @@ QString Theme::applicationStyleSheet() {
         }
         QTreeView::item {
             height: 26px;
-            border-radius: 4px;
+            background: transparent;
+            border: none;
             padding-left: 2px;
         }
-        QTreeView::item:hover {
-            background-color: #222229;
-            color: #ffffff;
-        }
-        QTreeView::item:selected {
-            background-color: #2a2c38;
-            color: #ffffff;
-        }
+        QTreeView::item:hover,
+        QTreeView::item:selected,
         QTreeView::item:selected:active {
-            background-color: #2a2e40;
+            background: transparent;
             color: #ffffff;
         }
-        QTreeView::branch:has-children:!has-siblings:closed,
-        QTreeView::branch:closed:has-children:has-siblings {
-            border-image: none;
-        }
-        QTreeView::branch:open:has-children:!has-siblings,
-        QTreeView::branch:open:has-children:has-siblings {
-            border-image: none;
+        QTreeView::branch,
+        QTreeView::branch:hover,
+        QTreeView::branch:selected,
+        QTreeView::branch:selected:active,
+        QTreeView::branch:selected:!active,
+        QTreeView::branch:has-children:hover,
+        QTreeView::branch:has-children:selected {
+            background: transparent;
         }
 
         /* ScrollBars */

@@ -2,6 +2,7 @@
 #include "CodeEditor.h"
 #include "MainWindow.h"
 #include "ExplorerPanel.h"
+#include "Theme.h"
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTreeView>
@@ -129,6 +130,7 @@ void OrbitTests::testExplorerFolderSingleClickExpand() {
     }
 
     ExplorerPanel panel;
+    panel.setStyleSheet(Theme::applicationStyleSheet());
     panel.resize(300, 500);
     panel.show();
     panel.setRootFolder(tempDir.path());
@@ -153,6 +155,14 @@ void OrbitTests::testExplorerFolderSingleClickExpand() {
 
     // Verify it expanded on single click
     QVERIFY(treeView->isExpanded(folderIndex));
+
+    treeView->setCurrentIndex(folderIndex);
+    if (treeView->selectionModel()) {
+        treeView->selectionModel()->select(folderIndex, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+    }
+    QTest::qWait(50);
+    QPixmap pixmap = panel.grab();
+    pixmap.save("/home/rachit/.gemini/antigravity-ide/brain/b746bfe9-4557-459b-a6f6-33d305091097/explorer_unified.png");
 
     // Simulate second single click
     QMetaObject::invokeMethod(&panel, "onItemClicked", Q_ARG(QModelIndex, folderIndex));

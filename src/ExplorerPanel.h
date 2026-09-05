@@ -1,16 +1,34 @@
 #pragma once
 
 #include <QWidget>
+#include <QTreeView>
 #include <QString>
 #include <QModelIndex>
 
 class QFileSystemModel;
-class QTreeView;
 class QStackedWidget;
 class QLabel;
 class QPushButton;
 
 namespace Orbit {
+
+class ExplorerTreeView : public QTreeView {
+    Q_OBJECT
+
+public:
+    explicit ExplorerTreeView(QWidget *parent = nullptr);
+
+protected:
+    void drawRow(QPainter *painter, const QStyleOptionViewItem &options, const QModelIndex &index) const override;
+    void drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void leaveEvent(QEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
+
+private:
+    QModelIndex m_hoveredIndex;
+};
 
 class ExplorerPanel : public QWidget {
     Q_OBJECT
@@ -34,7 +52,7 @@ private:
 
     QString m_currentFolderPath;
     QFileSystemModel *m_model;
-    QTreeView *m_treeView;
+    ExplorerTreeView *m_treeView;
     QStackedWidget *m_stackedWidget;
     QLabel *m_folderTitleLabel;
     QPushButton *m_openFolderBtn;

@@ -7,14 +7,152 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QFileSystemModel>
-#include <QTreeView>
 #include <QStackedWidget>
 #include <QFileInfo>
 #include <QDir>
 #include <QIcon>
 #include <QHeaderView>
+#include <QPainter>
+#include <QPainterPath>
+#include <QMouseEvent>
+#include <QWheelEvent>
 
 namespace Orbit {
+
+ExplorerTreeView::ExplorerTreeView(QWidget *parent)
+    : QTreeView(parent) {
+    setMouseTracking(true);
+    if (viewport()) {
+        viewport()->setMouseTracking(true);
+    }
+}
+
+void ExplorerTreeView::mouseMoveEvent(QMouseEvent *event) {
+    QModelIndex index = indexAt(event->pos());
+    if (index != m_hoveredIndex) {
+        m_hoveredIndex = index;
+        viewport()->update();
+    }
+    QTreeView::mouseMoveEvent(event);
+}
+
+void ExplorerTreeView::leaveEvent(QEvent *event) {
+    if (m_hoveredIndex.isValid()) {
+        m_hoveredIndex = QModelIndex();
+        viewport()->update();
+    }
+    QTreeView::leaveEvent(event);
+}
+
+void ExplorerTreeView::wheelEvent(QWheelEvent *event) {
+    QTreeView::wheelEvent(event);
+    if (viewport()) {
+        m_hoveredIndex = indexAt(viewport()->mapFromGlobal(QCursor::pos()));
+        viewport()->update();
+    }
+}
+
+void ExplorerTreeView::mousePressEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        QModelIndex index = indexAt(event->pos());
+        if (index.isValid()) {
+            setCurrentIndex(index);
+            if (selectionModel()) {
+                selectionModel()->select(index, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            }
+        }
+    }
+    QTreeView::mousePressEvent(event);
+}
+
+void ExplorerTreeView::drawRow(QPainter *painter, const QStyleOptionViewItem &options, const QModelIndex &index) const {
+    if (!index.isValid()) return;
+
+    bool isSelected = selectionModel() && selectionModel()->isSelected(index);
+    bool isHovered = (index == m_hoveredIndex);
+
+    // 1. Draw unified full-row highlight across entire viewport width
+    if (isSelected || isHovered) {
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        painter->setPen(Qt::NoPen);
+
+        if (isSelected) {
+            painter->setBrush(hasFocus() ? QColor(0x2a, 0x2e, 0x40) : QColor(0x24, 0x28, 0x36));
+        } else {
+            painter->setBrush(QColor(0x22, 0x22, 0x29));
+        }
+
+        QRect rowHighlight(4, options.rect.top() + 1, viewport()->width() - 8, options.rect.height() - 2);
+        painter->drawRoundedRect(rowHighlight, 4, 4);
+        painter->restore();
+    }
+
+    // 2. Draw branch chevron
+    QRect itemRect = visualRect(index);
+    QRect branchRect(0, options.rect.top(), itemRect.left(), options.rect.height());
+    drawBranches(painter, branchRect, index);
+
+    // 3. Draw item (icon and label) via delegate
+    QStyleOptionViewItem opt = options;
+    opt.rect = itemRect;
+    opt.state &= ~QStyle::State_HasFocus;
+    opt.state &= ~QStyle::State_Selected;
+
+    if (isSelected) {
+        opt.palette.setColor(QPalette::Text, Qt::white);
+        opt.palette.setColor(QPalette::WindowText, Qt::white);
+    }
+
+    auto *del = itemDelegateForIndex(index);
+    if (del) {
+        del->paint(painter, opt, index);
+    }
+}
+
+void ExplorerTreeView::drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const {
+    if (!index.isValid()) return;
+
+    auto *fsModel = qobject_cast<const QFileSystemModel*>(model());
+    bool isDir = fsModel ? fsModel->isDir(index) : model()->hasChildren(index);
+
+    if (!isDir) return;
+
+    int ind = indentation();
+    int arrowAreaLeft = rect.right() - ind + 1;
+    int arrowAreaRight = rect.right();
+    int centerX = (arrowAreaLeft + arrowAreaRight) / 2;
+    int centerY = rect.top() + rect.height() / 2;
+
+    bool isSelected = selectionModel() && selectionModel()->isSelected(index);
+    bool isHovered = (index == m_hoveredIndex);
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
+
+    QColor arrowColor = (isSelected || isHovered) ? QColor(0xea, 0xea, 0xf0) : QColor(0x72, 0x72, 0x82);
+    QPen pen(arrowColor, 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    painter->setPen(pen);
+    painter->setBrush(Qt::NoBrush);
+
+    if (isExpanded(index)) {
+        // Down chevron (expanded / open)
+        QPainterPath path;
+        path.moveTo(centerX - 3.5, centerY - 1.5);
+        path.lineTo(centerX, centerY + 2.5);
+        path.lineTo(centerX + 3.5, centerY - 1.5);
+        painter->drawPath(path);
+    } else {
+        // Right chevron (collapsed / closed)
+        QPainterPath path;
+        path.moveTo(centerX - 1.5, centerY - 3.5);
+        path.lineTo(centerX + 2.5, centerY);
+        path.lineTo(centerX - 1.5, centerY + 3.5);
+        painter->drawPath(path);
+    }
+
+    painter->restore();
+}
 
 ExplorerPanel::ExplorerPanel(QWidget *parent)
     : QWidget(parent)
@@ -128,11 +266,11 @@ void ExplorerPanel::setupUi() {
     m_model = new QFileSystemModel(this);
     m_model->setFilter(QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
 
-    m_treeView = new QTreeView(m_stackedWidget);
+    m_treeView = new ExplorerTreeView(m_stackedWidget);
     m_treeView->setModel(m_model);
     m_treeView->setHeaderHidden(true);
     m_treeView->setAnimated(true);
-    m_treeView->setIndentation(14);
+    m_treeView->setIndentation(16);
     m_treeView->setUniformRowHeights(true);
     m_treeView->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
