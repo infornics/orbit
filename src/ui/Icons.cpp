@@ -1,4 +1,4 @@
-#include "Icons.h"
+#include "ui/Icons.h"
 #include <QPainter>
 #include <QPainterPath>
 

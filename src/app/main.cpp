@@ -1,6 +1,6 @@
-#include "MainWindow.h"
-#include "Theme.h"
-#include "Icons.h"
+#include "app/MainWindow.h"
+#include "ui/Theme.h"
+#include "ui/Icons.h"
 
 #include <QApplication>
 #include <QFileInfo>

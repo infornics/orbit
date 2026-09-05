@@ -1,5 +1,5 @@
-#include "LineNumberArea.h"
-#include "CodeEditor.h"
+#include "editor/LineNumberArea.h"
+#include "editor/CodeEditor.h"
 
 namespace Orbit {
 

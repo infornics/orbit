@@ -1,7 +1,7 @@
-#include "CodeEditor.h"
-#include "LineNumberArea.h"
-#include "Theme.h"
-#include "SyntaxHighlighter.h"
+#include "editor/CodeEditor.h"
+#include "editor/LineNumberArea.h"
+#include "editor/SyntaxHighlighter.h"
+#include "ui/Theme.h"
 
 #include <QPainter>
 #include <QTextBlock>

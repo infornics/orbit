@@ -1,5 +1,5 @@
-#include "ExplorerPanel.h"
-#include "Icons.h"
+#include "explorer/ExplorerPanel.h"
+#include "ui/Icons.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>

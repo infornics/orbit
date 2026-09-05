@@ -1,4 +1,4 @@
-#include "SyntaxHighlighter.h"
+#include "editor/SyntaxHighlighter.h"
 #include <QFileInfo>
 #include <QFont>
 #include <QColor>

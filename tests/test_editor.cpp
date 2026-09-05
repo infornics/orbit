@@ -1,9 +1,9 @@
 #include <QtTest/QtTest>
-#include "CodeEditor.h"
-#include "MainWindow.h"
-#include "ExplorerPanel.h"
-#include "Theme.h"
-#include "SyntaxHighlighter.h"
+#include "editor/CodeEditor.h"
+#include "editor/SyntaxHighlighter.h"
+#include "app/MainWindow.h"
+#include "explorer/ExplorerPanel.h"
+#include "ui/Theme.h"
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTreeView>

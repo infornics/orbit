@@ -1,7 +1,7 @@
-#include "MainWindow.h"
-#include "ExplorerPanel.h"
-#include "CodeEditor.h"
-#include "Icons.h"
+#include "app/MainWindow.h"
+#include "explorer/ExplorerPanel.h"
+#include "editor/CodeEditor.h"
+#include "ui/Icons.h"
 
 #include <QApplication>
 #include <QSplitter>
