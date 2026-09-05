@@ -137,6 +137,7 @@ void ExplorerPanel::setupUi() {
     m_treeView->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_treeView->setExpandsOnDoubleClick(false);
 
     // Hide extra columns (size, type, date)
     for (int col = 1; col < m_model->columnCount(); ++col) {
@@ -195,6 +196,8 @@ void ExplorerPanel::onItemClicked(const QModelIndex &index) {
     QFileInfo fileInfo = m_model->fileInfo(index);
     if (fileInfo.isFile()) {
         emit fileActivated(fileInfo.absoluteFilePath());
+    } else if (fileInfo.isDir()) {
+        m_treeView->setExpanded(index, !m_treeView->isExpanded(index));
     }
 }
 

@@ -4,6 +4,8 @@
 #include "ExplorerPanel.h"
 #include <QTemporaryDir>
 #include <QTemporaryFile>
+#include <QTreeView>
+#include <QFileSystemModel>
 
 using namespace Orbit;
 
@@ -15,6 +17,7 @@ private slots:
     void testCodeEditorAutoIndent();
     void testMainWindowOpenAndSave();
     void testDirtyStateAndScreenshot();
+    void testExplorerFolderSingleClickExpand();
 };
 
 void OrbitTests::testCodeEditorTabAndIndent() {
@@ -111,6 +114,52 @@ void OrbitTests::testDirtyStateAndScreenshot() {
 
     QPixmap pixmap = window.grab();
     pixmap.save("/home/rachit/.gemini/antigravity-ide/brain/bea66796-e0e5-469a-9a79-cff795234df2/orbit_dirty.png");
+}
+
+void OrbitTests::testExplorerFolderSingleClickExpand() {
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    QDir dir(tempDir.path());
+    QVERIFY(dir.mkdir("subfolder"));
+    {
+        QFile file(dir.filePath("subfolder/child.txt"));
+        QVERIFY(file.open(QFile::WriteOnly));
+        file.write("hello");
+    }
+
+    ExplorerPanel panel;
+    panel.resize(300, 500);
+    panel.show();
+    panel.setRootFolder(tempDir.path());
+
+    auto *treeView = panel.findChild<QTreeView*>();
+    QVERIFY(treeView != nullptr);
+    auto *model = panel.findChild<QFileSystemModel*>();
+    QVERIFY(model != nullptr);
+
+    // Give the file system model a moment to discover directory contents
+    QTest::qWait(150);
+
+    QModelIndex folderIndex = model->index(dir.filePath("subfolder"));
+    QVERIFY(folderIndex.isValid());
+
+    // Initially not expanded
+    QVERIFY(!treeView->isExpanded(folderIndex));
+
+    // Simulate single click on folder
+    QMetaObject::invokeMethod(&panel, "onItemClicked", Q_ARG(QModelIndex, folderIndex));
+    QTest::qWait(50);
+
+    // Verify it expanded on single click
+    QVERIFY(treeView->isExpanded(folderIndex));
+
+    // Simulate second single click
+    QMetaObject::invokeMethod(&panel, "onItemClicked", Q_ARG(QModelIndex, folderIndex));
+    QTest::qWait(50);
+
+    // Verify it collapsed
+    QVERIFY(!treeView->isExpanded(folderIndex));
 }
 
 QTEST_MAIN(OrbitTests)
