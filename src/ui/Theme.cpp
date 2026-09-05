@@ -295,6 +295,59 @@ QString Theme::applicationStyleSheet() {
             background-color: #4f8cf6;
             border-color: #6ba0f8;
         }
+
+        /* Antigravity panel */
+        QWidget#antigravityPanel {
+            background-color: #18181c;
+            border-left: 1px solid #24242c;
+        }
+        QPlainTextEdit#agentComposer {
+            background-color: #1e1e24;
+            color: #eaeaf0;
+            border: 1px solid #2c2c36;
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 12px;
+            selection-background-color: #2d4268;
+        }
+        QPlainTextEdit#agentComposer:focus {
+            border-color: #4f8cf6;
+        }
+        QWidget#agentComposerRoot {
+            background: #151518;
+            border-top: 1px solid #24242c;
+        }
+        QComboBox {
+            background-color: #1e1e24;
+            color: #d6d6e2;
+            border: 1px solid #2c2c36;
+            border-radius: 5px;
+            padding: 3px 8px;
+            font-size: 11px;
+            min-width: 72px;
+        }
+        QComboBox:hover { border-color: #4f8cf6; }
+        QComboBox::drop-down { border: none; width: 16px; }
+        QComboBox QAbstractItemView {
+            background: #1b1b20;
+            color: #eaeaf0;
+            border: 1px solid #2c2c36;
+            selection-background-color: #262632;
+        }
+        QWidget#agentMentionPopup, QListWidget {
+            background: #1b1b20;
+            color: #eaeaf0;
+            border: 1px solid #2c2c36;
+        }
+        QProgressBar {
+            background-color: #24242d;
+            border: none;
+            border-radius: 2px;
+        }
+        QProgressBar::chunk {
+            background-color: #4f8cf6;
+            border-radius: 2px;
+        }
     )");
 }
 

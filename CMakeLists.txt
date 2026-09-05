@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
 qt_standard_project_setup()
 
 # Modular source definitions
@@ -37,6 +37,24 @@ set(UI_SOURCES
     src/ui/Theme.cpp
 )
 
+set(AGENT_SOURCES
+    src/agent/AcpClient.h
+    src/agent/AcpClient.cpp
+    src/agent/AntigravityInstaller.h
+    src/agent/AntigravityInstaller.cpp
+    src/agent/AntigravityPanel.h
+    src/agent/AntigravityPanel.cpp
+    src/agent/AgentTypes.h
+    src/agent/AgentThread.h
+    src/agent/AgentThread.cpp
+    src/agent/AgentTerminalHost.h
+    src/agent/AgentTerminalHost.cpp
+    src/agent/AgentComposer.h
+    src/agent/AgentComposer.cpp
+    src/agent/AgentTranscriptView.h
+    src/agent/AgentTranscriptView.cpp
+)
+
 set(RESOURCES
     resources/resources.qrc
 )
@@ -46,6 +64,7 @@ set(PROJECT_SOURCES
     ${EDITOR_SOURCES}
     ${EXPLORER_SOURCES}
     ${UI_SOURCES}
+    ${AGENT_SOURCES}
     ${RESOURCES}
 )
 
@@ -53,6 +72,7 @@ qt_add_executable(orbit ${PROJECT_SOURCES})
 
 target_link_libraries(orbit PRIVATE
     Qt6::Widgets
+    Qt6::Network
 )
 target_include_directories(orbit PRIVATE src)
 
@@ -82,11 +102,27 @@ if(Qt6Test_FOUND)
         src/ui/Icons.cpp
         src/ui/Theme.h
         src/ui/Theme.cpp
+        src/agent/AcpClient.h
+        src/agent/AcpClient.cpp
+        src/agent/AntigravityInstaller.h
+        src/agent/AntigravityInstaller.cpp
+        src/agent/AntigravityPanel.h
+        src/agent/AntigravityPanel.cpp
+        src/agent/AgentTypes.h
+        src/agent/AgentThread.h
+        src/agent/AgentThread.cpp
+        src/agent/AgentTerminalHost.h
+        src/agent/AgentTerminalHost.cpp
+        src/agent/AgentComposer.h
+        src/agent/AgentComposer.cpp
+        src/agent/AgentTranscriptView.h
+        src/agent/AgentTranscriptView.cpp
         ${RESOURCES}
     )
     target_include_directories(orbit_tests PRIVATE src)
     target_link_libraries(orbit_tests PRIVATE
         Qt6::Widgets
+        Qt6::Network
         Qt6::Test
     )
     add_test(NAME OrbitTests COMMAND orbit_tests)

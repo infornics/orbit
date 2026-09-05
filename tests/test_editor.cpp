@@ -4,11 +4,21 @@
 #include "app/MainWindow.h"
 #include "explorer/ExplorerPanel.h"
 #include "ui/Theme.h"
+#include "agent/AcpClient.h"
+#include "agent/AntigravityInstaller.h"
+#include "agent/AntigravityPanel.h"
+#include "agent/AgentThread.h"
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTreeView>
 #include <QFileSystemModel>
 #include <QLabel>
+#include <QSignalSpy>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QFileInfo>
+#include <QDir>
 
 using namespace Orbit;
 
@@ -25,6 +35,11 @@ private slots:
     void testAutoSave();
     void testUnsavedChangesDialog();
     void testRevertChangesClearsModified();
+    void testAntigravityInstallerRegistryParse();
+    void testAcpClientExtractText();
+    void testAcpClientMockHandshake();
+    void testAntigravityPanelToggle();
+    void testAgentThreadToolUpsertAndDiffs();
 };
 
 void OrbitTests::testCodeEditorTabAndIndent() {
@@ -366,6 +381,159 @@ void OrbitTests::testRevertChangesClearsModified() {
     editor->setTextCursor(c);
     QCOMPARE(editor->toPlainText(), QString("Hello World"));
     QVERIFY(!window.windowTitle().contains("•"));
+}
+
+void OrbitTests::testAntigravityInstallerRegistryParse() {
+    const QByteArray registry = R"({
+      "version": 1,
+      "agents": [
+        {
+          "id": "antigravity-acp",
+          "name": "Google Antigravity",
+          "distribution": {
+            "binary": {
+              "linux-x86_64": {
+                "archive": "https://example.test/linux.zip",
+                "cmd": "./agy_acp_server.par",
+                "args": ["--uid="]
+              },
+              "linux-aarch64": {
+                "archive": "https://example.test/linux-arm.zip",
+                "cmd": "./agy_acp_server.par",
+                "args": ["--uid="]
+              },
+              "darwin-aarch64": {
+                "archive": "https://example.test/mac.zip",
+                "cmd": "./agy_acp_server.par"
+              },
+              "darwin-x86_64": {
+                "archive": "https://example.test/mac-x64.zip",
+                "cmd": "./agy_acp_server.par"
+              },
+              "windows-x86_64": {
+                "archive": "https://example.test/win.zip",
+                "cmd": "./agy_acp_server.exe"
+              },
+              "windows-aarch64": {
+                "archive": "https://example.test/win-arm.zip",
+                "cmd": "./agy_acp_server.exe"
+              }
+            }
+          }
+        }
+      ]
+    })";
+
+    const AntigravityPlatformSpec spec = AntigravityInstaller::specFromRegistry(registry);
+    QVERIFY(!spec.archiveUrl.isEmpty());
+    QVERIFY(spec.archiveUrl.startsWith("https://example.test/"));
+    QVERIFY(spec.command.contains("agy_acp_server"));
+
+    const AntigravityPlatformSpec fallback = AntigravityInstaller::fallbackSpec();
+    QVERIFY(fallback.archiveUrl.contains("agy-acp-server"));
+    QVERIFY(!AntigravityInstaller::installDirectory().isEmpty());
+}
+
+void OrbitTests::testAcpClientExtractText() {
+    QCOMPARE(AcpClient::extractText(QJsonValue("plain")), QString("plain"));
+
+    QJsonObject block{{"type", "text"}, {"text", "chunk"}};
+    QCOMPARE(AcpClient::extractText(block), QString("chunk"));
+
+    QJsonArray parts{
+        QJsonObject{{"type", "text"}, {"text", "hel"}},
+        QJsonObject{{"type", "text"}, {"text", "lo"}}
+    };
+    QCOMPARE(AcpClient::extractText(parts), QString("hello"));
+}
+
+void OrbitTests::testAcpClientMockHandshake() {
+    const QString mock = QFileInfo(QString::fromUtf8(__FILE__)).dir().filePath("mock_acp_server.py");
+    QVERIFY(QFileInfo::exists(mock));
+
+    AcpClient client;
+    QSignalSpy startedSpy(&client, &AcpClient::started);
+    QSignalSpy initSpy(&client, &AcpClient::initialized);
+    QSignalSpy sessionSpy(&client, &AcpClient::sessionReady);
+    QSignalSpy textSpy(&client, &AcpClient::agentText);
+    QSignalSpy doneSpy(&client, &AcpClient::promptFinished);
+    QSignalSpy errorSpy(&client, &AcpClient::errorOccurred);
+
+    client.start(QStringLiteral("python3"), QStringList{QStringLiteral("-u"), mock}, QString());
+    QVERIFY(startedSpy.wait(3000));
+
+    client.initialize();
+    QVERIFY(initSpy.wait(3000));
+    QCOMPARE(errorSpy.count(), 0);
+
+    client.createSession(QDir::tempPath());
+    QVERIFY(sessionSpy.wait(3000));
+    QCOMPARE(client.sessionId(), QString("sess_test"));
+
+    QJsonArray prompt{QJsonObject{{"type", "text"}, {"text", "hi"}}};
+    client.sendPrompt(prompt);
+    QVERIFY(textSpy.wait(3000));
+    QCOMPARE(textSpy.takeFirst().at(0).toString(), QString("hello from mock"));
+    QVERIFY(doneSpy.wait(3000) || doneSpy.count() > 0);
+
+    client.stop();
+}
+
+void OrbitTests::testAntigravityPanelToggle() {
+    MainWindow window;
+    window.resize(1100, 720);
+    window.show();
+
+    auto *panel = window.findChild<AntigravityPanel *>();
+    QVERIFY(panel != nullptr);
+    QVERIFY(!panel->isVisible());
+
+    QMetaObject::invokeMethod(&window, "onToggleAntigravity");
+    QTest::qWait(50);
+    QVERIFY(panel->isVisible());
+
+    QMetaObject::invokeMethod(&window, "onToggleAntigravity");
+    QTest::qWait(50);
+    QVERIFY(!panel->isVisible());
+}
+
+void OrbitTests::testAgentThreadToolUpsertAndDiffs() {
+    AgentThread thread;
+    QCOMPARE(thread.count(), 0);
+
+    thread.appendUser("refactor this");
+    thread.appendAgentChunk("I'll edit the file.");
+    thread.appendAgentChunk(" Next chunk.");
+    QCOMPARE(thread.count(), 2);
+    QCOMPARE(thread.at(1).text, QString("I'll edit the file. Next chunk."));
+
+    QJsonObject tool{
+        {"toolCallId", "call_1"},
+        {"title", "Editing MainWindow.cpp"},
+        {"kind", "edit"},
+        {"status", "in_progress"},
+        {"locations", QJsonArray{QJsonObject{{"path", "/tmp/MainWindow.cpp"}}}},
+        {"content", QJsonArray{QJsonObject{
+            {"type", "diff"},
+            {"path", "/tmp/MainWindow.cpp"},
+            {"oldText", "int a = 1;"},
+            {"newText", "int a = 2;"}
+        }}}
+    };
+    thread.upsertToolCall(tool);
+    QCOMPARE(thread.count(), 3);
+    QCOMPARE(thread.at(2).tool.title, QString("Editing MainWindow.cpp"));
+    QCOMPARE(thread.pendingDiffs().size(), 1);
+
+    thread.upsertToolCall(QJsonObject{
+        {"toolCallId", "call_1"},
+        {"status", "completed"}
+    });
+    QCOMPARE(thread.at(2).tool.status, QString("completed"));
+    QCOMPARE(thread.at(2).tool.title, QString("Editing MainWindow.cpp"));
+
+    thread.markDiffsReviewed();
+    QCOMPARE(thread.pendingDiffs().size(), 0);
 }
 
 QTEST_MAIN(OrbitTests)

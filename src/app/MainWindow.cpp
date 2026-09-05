@@ -1,6 +1,7 @@
 #include "app/MainWindow.h"
 #include "explorer/ExplorerPanel.h"
 #include "editor/CodeEditor.h"
+#include "agent/AntigravityPanel.h"
 #include "ui/Icons.h"
 
 #include <QApplication>
@@ -26,6 +27,10 @@
 #include <QStringConverter>
 #include <QKeySequence>
 #include <QShortcut>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QTextCursor>
+#include <QChar>
 
 namespace Orbit {
 
@@ -40,6 +45,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_editorStack(nullptr)
     , m_welcomeWidget(nullptr)
     , m_editor(nullptr)
+    , m_antigravityPanel(nullptr)
     , m_statusMsgLabel(nullptr)
     , m_languageLabel(nullptr)
     , m_encodingLabel(nullptr)
@@ -190,6 +196,7 @@ void MainWindow::setupUi() {
     addShortcutRow(tr("New File"), "Ctrl + N");
     addShortcutRow(tr("Save File"), "Ctrl + S");
     addShortcutRow(tr("Toggle Sidebar"), "Ctrl + B");
+    addShortcutRow(tr("Antigravity"), "Ctrl + L");
 
     welcomeLayout->addWidget(logoLabel);
     welcomeLayout->addWidget(titleLabel);
@@ -217,11 +224,44 @@ void MainWindow::setupUi() {
     editorLayout->addWidget(m_editorStack);
 
     // Splitter configuration
+    m_antigravityPanel = new AntigravityPanel(m_splitter);
+    m_antigravityPanel->setWorkspaceProvider([this]() {
+        if (!m_explorerPanel->currentFolderPath().isEmpty()) {
+            return m_explorerPanel->currentFolderPath();
+        }
+        if (!m_isUntitled && !m_currentFilePath.isEmpty()) {
+            return QFileInfo(m_currentFilePath).absolutePath();
+        }
+        return QDir::homePath();
+    });
+    m_antigravityPanel->setBufferProvider([this](const QString &path) -> QString {
+        if (!m_isUntitled && path == m_currentFilePath) {
+            return m_editor->toPlainText();
+        }
+        return QString(); // null: read from disk
+    });
+    m_antigravityPanel->setFileReloadedHandler([this](const QString &path) {
+        reloadFileFromDisk(path);
+    });
+    m_antigravityPanel->setSelectionProvider([this]() {
+        QString selected = m_editor->textCursor().selectedText();
+        selected.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+        return selected;
+    });
+    connect(m_antigravityPanel, &AntigravityPanel::requestOpenFile, this, [this](const QString &path) {
+        if (m_currentFilePath != path) {
+            openFile(path);
+        }
+    });
+
     m_splitter->addWidget(m_explorerPanel);
     m_splitter->addWidget(m_editorContainer);
+    m_splitter->addWidget(m_antigravityPanel);
     m_splitter->setStretchFactor(0, 0);
     m_splitter->setStretchFactor(1, 1);
-    m_splitter->setSizes({260, 840});
+    m_splitter->setStretchFactor(2, 0);
+    m_splitter->setSizes({260, 780, 400});
+    m_antigravityPanel->hide();
 
     rootLayout->addWidget(m_splitter);
 
@@ -268,6 +308,7 @@ void MainWindow::createMenus() {
     // --- View Menu ---
     auto *viewMenu = menuBar()->addMenu(tr("&View"));
     viewMenu->addAction(tr("Toggle &Sidebar"), QKeySequence(Qt::CTRL | Qt::Key_B), this, &MainWindow::onToggleSidebar);
+    viewMenu->addAction(tr("Toggle &Antigravity"), QKeySequence(Qt::CTRL | Qt::Key_L), this, &MainWindow::onToggleAntigravity);
     viewMenu->addSeparator();
     viewMenu->addAction(tr("Zoom &In"), QKeySequence::ZoomIn, this, [this]() {
         m_editor->setEditorFontSize(m_editor->editorFontSize() + 1);
@@ -281,6 +322,9 @@ void MainWindow::createMenus() {
 
     // --- Help Menu ---
     auto *helpMenu = menuBar()->addMenu(tr("&Help"));
+    helpMenu->addAction(tr("Antigravity &Docs"), this, []() {
+        QDesktopServices::openUrl(QUrl(QStringLiteral("https://antigravity.google/docs/ide/extensions/")));
+    });
     helpMenu->addAction(tr("&About Orbit"), this, &MainWindow::onAbout);
 }
 
@@ -420,6 +464,9 @@ bool MainWindow::openFile(const QString &filePath) {
     updateTitleAndHeader();
     m_editor->setFocus();
     m_statusMsgLabel->setText(tr("Ready"));
+    if (m_antigravityPanel) {
+        m_antigravityPanel->setCurrentFile(filePath);
+    }
 
     return true;
 }
@@ -521,10 +568,59 @@ void MainWindow::onCloseFile() {
     m_fileHeaderBar->hide();
     updateTitleAndHeader();
     m_statusMsgLabel->setText(tr("Ready"));
+    if (m_antigravityPanel) {
+        m_antigravityPanel->setCurrentFile(QString());
+    }
 }
 
 void MainWindow::onToggleSidebar() {
     m_explorerPanel->setVisible(!m_explorerPanel->isVisible());
+}
+
+void MainWindow::onToggleAntigravity() {
+    const bool show = !m_antigravityPanel->isVisible();
+    m_antigravityPanel->setVisible(show);
+    if (show) {
+        m_antigravityPanel->setCurrentFile(m_isUntitled ? QString() : m_currentFilePath);
+        m_antigravityPanel->startIfInstalled();
+        if (m_splitter->sizes().value(2, 0) < 200) {
+            QList<int> sizes = m_splitter->sizes();
+            while (sizes.size() < 3) {
+                sizes.append(0);
+            }
+            sizes[2] = 400;
+            if (sizes[1] > 500) {
+                sizes[1] -= 80;
+            }
+            m_splitter->setSizes(sizes);
+        }
+    }
+}
+
+void MainWindow::reloadFileFromDisk(const QString &filePath) {
+    if (m_isUntitled || m_currentFilePath != filePath) {
+        return;
+    }
+
+    QFile file(filePath);
+    if (!file.open(QFile::ReadOnly | QFile::Text)) {
+        return;
+    }
+    QTextStream in(&file);
+    in.setEncoding(QStringConverter::Utf8);
+    const QString content = in.readAll();
+    file.close();
+
+    const int cursorPos = m_editor->textCursor().position();
+    m_editor->setPlainText(content);
+    QTextCursor cursor = m_editor->textCursor();
+    cursor.setPosition(qMin(cursorPos, content.size()));
+    m_editor->setTextCursor(cursor);
+
+    m_savedContent = content;
+    m_editor->document()->setModified(false);
+    m_isDirty = false;
+    updateTitleAndHeader();
 }
 
 void MainWindow::onDocumentModified() {
@@ -589,7 +685,7 @@ void MainWindow::onAbout() {
     msgBox.setIconPixmap(Icons::orbit(48).pixmap(48, 48));
     msgBox.setText(tr("<h3>Orbit 0.1.0</h3>"
                       "<p>A fast, focused, and elegant native code and text editor built with C++20 and Qt 6.</p>"
-                      "<p>Designed for distraction-free editing on Linux.</p>"));
+                      "<p>Includes native Google Antigravity support via the Agent Client Protocol.</p>"));
     auto *okBtn = msgBox.addButton(tr("OK"), QMessageBox::AcceptRole);
     okBtn->setIcon(QIcon());
     msgBox.exec();

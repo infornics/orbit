@@ -14,6 +14,7 @@ namespace Orbit {
 
 class ExplorerPanel;
 class CodeEditor;
+class AntigravityPanel;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -38,7 +39,9 @@ private slots:
     void onToggleAutoSave(bool checked);
     void onAutoSaveTimeout();
     void onToggleSidebar();
+    void onToggleAntigravity();
     void onAbout();
+    void reloadFileFromDisk(const QString &filePath);
 
     void onDocumentModified();
     void onCursorLocationChanged(int line, int col);
@@ -65,6 +68,7 @@ private:
     QStackedWidget *m_editorStack;
     QWidget *m_welcomeWidget;
     CodeEditor *m_editor;
+    AntigravityPanel *m_antigravityPanel;
 
     // Status bar labels
     QLabel *m_statusMsgLabel;

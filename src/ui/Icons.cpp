@@ -223,4 +223,26 @@ QIcon Icons::check(int size, const QColor &color) {
     return QIcon(pixmap);
 }
 
+QIcon Icons::antigravity(int size, const QColor &color) {
+    QPixmap pixmap(size, size);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setBrush(color);
+    painter.setPen(Qt::NoPen);
+
+    QPainterPath bolt;
+    bolt.moveTo(size * 0.58, size * 0.08);
+    bolt.lineTo(size * 0.22, size * 0.54);
+    bolt.lineTo(size * 0.48, size * 0.54);
+    bolt.lineTo(size * 0.40, size * 0.92);
+    bolt.lineTo(size * 0.80, size * 0.42);
+    bolt.lineTo(size * 0.54, size * 0.42);
+    bolt.closeSubpath();
+    painter.drawPath(bolt);
+
+    return QIcon(pixmap);
+}
+
 } // namespace Orbit

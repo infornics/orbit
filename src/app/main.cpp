@@ -40,6 +40,8 @@ int main(int argc, char *argv[]) {
     parser.addOption(autoSaveOption);
     QCommandLineOption showDialogOption("show-unsaved-dialog", "Show unsaved dialog for screenshot");
     parser.addOption(showDialogOption);
+    QCommandLineOption showAntigravityOption("show-antigravity", "Show the Antigravity panel");
+    parser.addOption(showAntigravityOption);
     parser.addPositionalArgument("path", "Initial file or directory to open", "[path]");
     parser.process(app);
 
@@ -68,6 +70,10 @@ int main(int argc, char *argv[]) {
     }
 
     window.show();
+
+    if (parser.isSet(showAntigravityOption)) {
+        QMetaObject::invokeMethod(&window, "onToggleAntigravity");
+    }
 
     if (parser.isSet(showDialogOption)) {
         QMessageBox msgBox(&window);

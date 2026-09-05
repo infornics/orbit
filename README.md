@@ -33,6 +33,10 @@ It embraces purposeful minimalism: one project folder, an intuitive file explore
   - Refined electric blue accents with low-contrast borders.
   - Subdued status bar reporting encoding, line endings, indentation, and live `Ln, Col` cursor position.
   - Remembers window geometry, splitter sizes, and last opened folder across sessions via `QSettings`.
+- **Google Antigravity**:
+  - Native side panel that installs and runs Google's official Antigravity ACP server (`agy_acp_server`).
+  - Same agent harness used by the VS Code, Zed, JetBrains, and Xcode extensions — Orbit cannot load those IDE plugins directly, so it speaks the Agent Client Protocol instead.
+  - Sign in with your Google account, chat with the agent, review tool calls, and apply file edits in the open workspace.
 
 ---
 
@@ -47,10 +51,26 @@ It embraces purposeful minimalism: one project folder, an intuitive file explore
 | `Ctrl + Shift + S` | Save File As |
 | `Ctrl + W` | Close File |
 | `Ctrl + B` | Toggle Explorer Sidebar |
+| `Ctrl + L` | Toggle Antigravity panel |
 | `Ctrl + +` / `Ctrl + =` | Zoom In Font |
 | `Ctrl + -` | Zoom Out Font |
 | `Ctrl + 0` | Reset Zoom |
 | `Ctrl + Q` | Quit Orbit |
+
+---
+
+## Google Antigravity
+
+Orbit is a native Qt editor, so it cannot load the official **Visual Studio Code**, **JetBrains**, **Zed**, or **Xcode** plugins. Those extensions are bound to each IDE's own plugin API.
+
+Instead, Orbit uses the same integration path as Zed: Google's official **Antigravity ACP server** (`agy_acp_server`) from the [ACP Registry](https://github.com/agentclientprotocol/registry). That server is the agent backend behind the first-party IDE extensions.
+
+1. Press `Ctrl + L` (or **View → Toggle Antigravity**).
+2. Click **Install Antigravity**. Orbit downloads the official binary from Google into `~/.local/share/OrbitEditor/Orbit/antigravity/`.
+3. Click **Sign in with Google** if prompted, and complete login in the browser.
+4. Use the agent thread like Zed: `@` to mention files, drop images onto the composer, `/` for slash commands, review tool cards and diffs, Keep/Reject edits, Stop a running turn. The open selection is attached automatically. Agent terminals run inside the thread.
+
+You need a Google account with any Antigravity plan, including the free tier. See the [IDE Extensions docs](https://antigravity.google/docs/ide/extensions/) and [CLI install docs](https://antigravity.google/docs/cli/install).
 
 ---
 
