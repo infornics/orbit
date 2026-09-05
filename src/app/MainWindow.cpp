@@ -35,8 +35,6 @@ MainWindow::MainWindow(QWidget *parent)
     , m_fileHeaderBar(nullptr)
     , m_filePathLabel(nullptr)
     , m_dirtyIndicatorLabel(nullptr)
-    , m_quickSaveBtn(nullptr)
-    , m_quickCloseBtn(nullptr)
     , m_editorStack(nullptr)
     , m_welcomeWidget(nullptr)
     , m_editor(nullptr)
@@ -108,48 +106,9 @@ void MainWindow::setupUi() {
 
     m_filePathLabel = new QLabel(m_fileHeaderBar);
     m_filePathLabel->setStyleSheet("color: #b0b0be; font-size: 12px; font-weight: 500; border: none;");
-
-    m_quickSaveBtn = new QPushButton(m_fileHeaderBar);
-    m_quickSaveBtn->setIcon(Icons::save(16));
-    m_quickSaveBtn->setIconSize(QSize(16, 16));
-    m_quickSaveBtn->setToolTip(tr("Save File (Ctrl+S)"));
-    m_quickSaveBtn->setFixedSize(26, 26);
-    m_quickSaveBtn->setCursor(Qt::PointingHandCursor);
-    m_quickSaveBtn->setStyleSheet(QString(R"(
-        QPushButton {
-            background: transparent;
-            border: none;
-            border-radius: 4px;
-        }
-        QPushButton:hover {
-            background-color: #262632;
-        }
-    )"));
-    connect(m_quickSaveBtn, &QPushButton::clicked, this, &MainWindow::onSaveFile);
-
-    m_quickCloseBtn = new QPushButton(m_fileHeaderBar);
-    m_quickCloseBtn->setIcon(Icons::close(14));
-    m_quickCloseBtn->setIconSize(QSize(14, 14));
-    m_quickCloseBtn->setToolTip(tr("Close File (Ctrl+W)"));
-    m_quickCloseBtn->setFixedSize(26, 26);
-    m_quickCloseBtn->setCursor(Qt::PointingHandCursor);
-    m_quickCloseBtn->setStyleSheet(QString(R"(
-        QPushButton {
-            background: transparent;
-            border: none;
-            border-radius: 4px;
-        }
-        QPushButton:hover {
-            background-color: #262632;
-        }
-    )"));
-    connect(m_quickCloseBtn, &QPushButton::clicked, this, &MainWindow::onCloseFile);
-
     headerLayout->addWidget(m_dirtyIndicatorLabel);
     headerLayout->addWidget(m_filePathLabel);
     headerLayout->addStretch();
-    headerLayout->addWidget(m_quickSaveBtn);
-    headerLayout->addWidget(m_quickCloseBtn);
 
     editorLayout->addWidget(m_fileHeaderBar);
     m_fileHeaderBar->hide();

@@ -57,8 +57,6 @@ private:
     QWidget *m_fileHeaderBar;
     QLabel *m_filePathLabel;
     QLabel *m_dirtyIndicatorLabel;
-    QPushButton *m_quickSaveBtn;
-    QPushButton *m_quickCloseBtn;
 
     QStackedWidget *m_editorStack;
     QWidget *m_welcomeWidget;
