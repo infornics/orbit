@@ -1,0 +1,79 @@
+# ===============================
+# Build Directories & CMake Output
+# ===============================
+build/
+build-*/
+cmake-build-*/
+out/
+bin/
+
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+ninja.log
+.ninja_deps
+.ninja_log
+
+# ===============================
+# Qt & Build Artifacts
+# ===============================
+*_autogen/
+*.moc
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+*.qmake.stash
+
+# Compiled Object Files & Libraries
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+
+# Debug Symbols
+*.dSYM/
+*.pdb
+*.idb
+
+# Core Dumps & Logs
+core
+core.*
+vgcore.*
+*.log
+
+# ===============================
+# IDE & Editor Configurations
+# ===============================
+# Qt Creator
+*.user
+*.user.*
+
+# Visual Studio Code
+.vscode/
+
+# JetBrains (CLion)
+.idea/
+
+# Vim / Emacs / Sublime
+*~
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# ===============================
+# Operating System Files
+# ===============================
+.DS_Store
+Thumbs.db
+.directory
