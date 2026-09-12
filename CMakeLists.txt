@@ -127,3 +127,42 @@ if(Qt6Test_FOUND)
     )
     add_test(NAME OrbitTests COMMAND orbit_tests)
 endif()
+
+# ==============================================================================
+# Installation & Packaging (Linux / Debian / Ubuntu .deb)
+# ==============================================================================
+include(GNUInstallDirs)
+
+install(TARGETS orbit
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(FILES resources/icons/orbit.svg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+)
+
+install(FILES resources/icons/orbit_logo.jpg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps
+    RENAME orbit.jpg
+)
+
+install(FILES resources/orbit.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+)
+
+# CPack Debian Package Settings
+set(CPACK_PACKAGE_NAME "orbit")
+set(CPACK_PACKAGE_VENDOR "Infornics")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Fast, focused C++/Qt6 code and text editor with Google Antigravity integration")
+set(CPACK_PACKAGE_VERSION_MAJOR 0)
+set(CPACK_PACKAGE_VERSION_MINOR 1)
+set(CPACK_PACKAGE_VERSION_PATCH 0)
+set(CPACK_PACKAGE_CONTACT "Infornics <support@infornics.com>")
+
+set(CPACK_GENERATOR "DEB")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Infornics")
+set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+
+include(CPack)
+

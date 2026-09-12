@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Orbit
+GenericName=Code Editor
+Comment=Fast, focused C++/Qt6 code and text editor with Google Antigravity integration
+Exec=orbit %F
+Icon=orbit
+Terminal=false
+Categories=Development;TextEditor;IDE;
+MimeType=text/plain;text/x-c++;text/x-c;text/x-python;text/x-cmake;application/json;
+Keywords=Text;Editor;Code;C++;Qt;Development;Antigravity;
