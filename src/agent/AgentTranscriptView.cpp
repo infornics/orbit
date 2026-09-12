@@ -85,22 +85,110 @@ QTextDocument *AgentEntryDelegate::documentFor(const AgentEntry &entry, int widt
         m_docs.insert(entry.id, doc);
     }
     m_docSource.insert(entry.id, entry.text);
+
     doc->setDefaultFont(Theme::uiFont(10));
-    doc->setDocumentMargin(0);
-    QString markdown = entry.text;
-    if (entry.type == AgentEntryType::User) {
-        doc->setPlainText(entry.text);
-    } else {
-        doc->setMarkdown(markdown);
-    }
+    doc->setDocumentMargin(4);
+    doc->setTextWidth(textWidth);
+
+    // Modern high-contrast CSS stylesheet set BEFORE setMarkdown / setPlainText
+    static const QString styleSheet = QStringLiteral(R"(
+        body, p, li, td, th, div, span {
+            color: #e2e8f0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #f8fafc;
+            font-weight: 600;
+            margin-top: 12px;
+            margin-bottom: 6px;
+        }
+        h1 { font-size: 16px; color: #f8fafc; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+        h2 { font-size: 15px; color: #f8fafc; border-bottom: 1px solid #1e293b; padding-bottom: 3px; }
+        h3 { font-size: 14px; color: #38bdf8; }
+        h4 { font-size: 13px; color: #38bdf8; }
+        a {
+            color: #38bdf8;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        code {
+            background-color: #1e293b;
+            color: #38bdf8;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        pre {
+            background-color: #0f172a;
+            color: #e2e8f0;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 12px;
+            padding: 8px 12px;
+            border: 1px solid #1e293b;
+            border-radius: 6px;
+            margin: 8px 0;
+        }
+        ul, ol {
+            margin-left: 16px;
+            margin-top: 4px;
+            margin-bottom: 8px;
+            color: #e2e8f0;
+        }
+        li {
+            color: #e2e8f0;
+            margin-bottom: 4px;
+        }
+        strong, b {
+            color: #ffffff;
+            font-weight: 600;
+        }
+        em, i {
+            color: #94a3b8;
+        }
+        blockquote {
+            border-left: 3px solid #38bdf8;
+            margin: 8px 0;
+            padding-left: 10px;
+            color: #94a3b8;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #334155;
+            margin: 10px 0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 8px 0;
+        }
+        th {
+            background-color: #1e293b;
+            color: #f8fafc;
+            font-weight: 600;
+            padding: 6px 10px;
+            border: 1px solid #334155;
+        }
+        td {
+            padding: 6px 10px;
+            border: 1px solid #334155;
+            color: #e2e8f0;
+        }
+    )");
+
+    doc->setDefaultStyleSheet(styleSheet);
+
     QTextOption opt = doc->defaultTextOption();
     opt.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     doc->setDefaultTextOption(opt);
-    doc->setDefaultStyleSheet(QStringLiteral(
-        "body { color: #d6d6e2; } "
-        "code { background: #24242d; color: #c8d4e8; } "
-        "pre { background: #16161c; color: #c8d4e8; }"));
-    doc->setTextWidth(textWidth);
+
+    if (entry.type == AgentEntryType::User) {
+        doc->setPlainText(entry.text);
+    } else {
+        doc->setMarkdown(entry.text);
+    }
+
     m_docWidth.insert(entry.id, textWidth);
     return doc;
 }
@@ -162,20 +250,20 @@ QSize AgentEntryDelegate::sizeHint(const QStyleOptionViewItem &option, const QMo
     switch (entry.type) {
     case AgentEntryType::User: {
         QTextDocument *doc = documentFor(entry, width);
-        return QSize(width, qCeil(doc->size().height()) + 20);
+        return QSize(width, qCeil(doc->size().height()) + 22);
     }
     case AgentEntryType::Agent: {
         QTextDocument *doc = documentFor(entry, width);
         return QSize(width, qMax(28, qCeil(doc->size().height()) + 16));
     }
     case AgentEntryType::Thought:
-        return QSize(width, 22 + (entry.text.size() / 60) * 14);
+        return QSize(width, 24 + (entry.text.size() / 55) * 16);
     case AgentEntryType::ToolCall:
-        return QSize(width, 36 + toolExtraHeight(entry, width));
+        return QSize(width, 38 + toolExtraHeight(entry, width));
     case AgentEntryType::Plan:
-        return QSize(width, 16 + entry.plan.size() * 22);
+        return QSize(width, 18 + entry.plan.size() * 24);
     case AgentEntryType::Permission:
-        return QSize(width, entry.permission.resolved ? 36 : 78 + entry.permission.diffs.size() * 18);
+        return QSize(width, entry.permission.resolved ? 38 : 82 + entry.permission.diffs.size() * 18);
     case AgentEntryType::System:
         return QSize(width, 28);
     }
@@ -194,7 +282,7 @@ void AgentEntryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
 
     switch (entry.type) {
     case AgentEntryType::User: {
-        drawRounded(painter, rect, QColor(0x24, 0x24, 0x2d), QColor(0x32, 0x32, 0x3f), 10);
+        drawRounded(painter, rect, QColor(0x1e, 0x29, 0x3b), QColor(0x33, 0x41, 0x55), 10);
         QTextDocument *doc = documentFor(entry, option.rect.width());
         painter->translate(rect.left() + 10, rect.top() + 8);
         doc->drawContents(painter, QRectF(0, 0, rect.width() - 20, rect.height()));
@@ -207,20 +295,21 @@ void AgentEntryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         break;
     }
     case AgentEntryType::Thought: {
-        painter->setPen(QColor(0x6e, 0x6e, 0x7e));
+        drawRounded(painter, rect, QColor(0x0f, 0x17, 0x2a), QColor(0x1e, 0x29, 0x3b), 6);
+        painter->setPen(QColor(0x94, 0xa3, 0xb8));
         QFont italic = Theme::uiFont(9);
         italic.setItalic(true);
         painter->setFont(italic);
-        painter->drawText(rect.adjusted(4, 0, -4, 0), Qt::TextWordWrap, entry.text);
+        painter->drawText(rect.adjusted(10, 4, -10, -4), Qt::TextWordWrap, entry.text);
         break;
     }
     case AgentEntryType::ToolCall: {
-        drawRounded(painter, rect, QColor(0x1c, 0x1c, 0x22), QColor(0x2a, 0x2a, 0x34), 8);
+        drawRounded(painter, rect, QColor(0x0f, 0x17, 0x2a), QColor(0x1e, 0x29, 0x3b), 8);
         QColor dot = statusColor(entry.tool.status);
         painter->setBrush(dot);
         painter->setPen(Qt::NoPen);
-        painter->drawEllipse(QPoint(rect.left() + 14, rect.top() + 16), 4, 4);
-        painter->setPen(QColor(0xc4, 0xc4, 0xd0));
+        painter->drawEllipse(QPoint(rect.left() + 14, rect.top() + 17), 4, 4);
+        painter->setPen(QColor(0x38, 0xbd, 0xf8));
         painter->setFont(Theme::uiFont(9));
         const QString label = QStringLiteral("%1  ·  %2")
                                   .arg(kindGlyph(entry.tool.kind), entry.tool.title);
@@ -228,8 +317,8 @@ void AgentEntryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
                           Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine,
                           QFontMetrics(painter->font()).elidedText(label, Qt::ElideRight, rect.width() - 36));
         if (entry.tool.expanded) {
-            int y = rect.top() + 30;
-            painter->setPen(QColor(0x8f, 0x92, 0xa4));
+            int y = rect.top() + 32;
+            painter->setPen(QColor(0x94, 0xa3, 0xb8));
             painter->setFont(Theme::monoFont(8));
             for (const QString &path : entry.tool.locations) {
                 painter->drawText(QRect(rect.left() + 14, y, rect.width() - 28, 16),
@@ -239,14 +328,14 @@ void AgentEntryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
             }
             for (const AgentDiff &diff : entry.tool.diffs) {
                 const QString name = QFileInfo(diff.path).fileName();
-                painter->setPen(QColor(0x4f, 0x8c, 0xf6));
+                painter->setPen(QColor(0x38, 0xbd, 0xf8));
                 painter->drawText(QRect(rect.left() + 14, y, rect.width() - 28, 16),
                                   Qt::AlignLeft | Qt::AlignVCenter,
                                   QStringLiteral("Δ %1").arg(name));
                 y += 18;
             }
             if (!entry.tool.body.isEmpty()) {
-                painter->setPen(QColor(0x7a, 0x7a, 0x88));
+                painter->setPen(QColor(0x94, 0xa3, 0xb8));
                 painter->setFont(Theme::monoFont(8));
                 painter->drawText(QRect(rect.left() + 14, y, rect.width() - 28, rect.bottom() - y - 6),
                                   Qt::TextWordWrap,
@@ -256,7 +345,7 @@ void AgentEntryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         break;
     }
     case AgentEntryType::Plan: {
-        drawRounded(painter, rect, QColor(0x18, 0x1c, 0x24), QColor(0x2a, 0x34, 0x44), 8);
+        drawRounded(painter, rect, QColor(0x0f, 0x17, 0x2a), QColor(0x1e, 0x29, 0x3b), 8);
         int y = rect.top() + 8;
         painter->setFont(Theme::uiFont(9));
         for (const AgentPlanStep &step : entry.plan) {
@@ -264,7 +353,7 @@ void AgentEntryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
             painter->setBrush(c);
             painter->setPen(Qt::NoPen);
             painter->drawEllipse(QPoint(rect.left() + 14, y + 7), 3, 3);
-            painter->setPen(QColor(0xc4, 0xc4, 0xd0));
+            painter->setPen(QColor(0xe2, 0xe8, 0xf0));
             painter->drawText(QRect(rect.left() + 24, y, rect.width() - 34, 18),
                               Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine, step.content);
             y += 22;
@@ -272,8 +361,8 @@ void AgentEntryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         break;
     }
     case AgentEntryType::Permission: {
-        drawRounded(painter, rect, QColor(0x22, 0x1c, 0x14), QColor(0x5a, 0x4a, 0x2a), 8);
-        painter->setPen(QColor(0xe8, 0xd5, 0xa8));
+        drawRounded(painter, rect, QColor(0x1e, 0x1b, 0x12), QColor(0x78, 0x5c, 0x24), 8);
+        painter->setPen(QColor(0xfd, 0xba, 0x74));
         painter->setFont(Theme::uiFont(10));
         QFont bold = painter->font();
         bold.setBold(true);
@@ -281,7 +370,7 @@ void AgentEntryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         painter->drawText(rect.adjusted(12, 8, -12, 0), Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap,
                           entry.permission.title);
         if (entry.permission.resolved) {
-            painter->setPen(QColor(0x8f, 0x92, 0xa4));
+            painter->setPen(QColor(0x94, 0xa3, 0xb8));
             painter->setFont(Theme::uiFont(9));
             painter->drawText(rect.adjusted(12, 0, -12, -8), Qt::AlignLeft | Qt::AlignBottom,
                               entry.permission.resolution);
@@ -289,8 +378,8 @@ void AgentEntryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
             const LayoutRects lay = layoutFor(option, index.row(), rect.width());
             auto drawBtn = [&](const QRect &r, const QString &label, bool primary) {
                 drawRounded(painter, r,
-                            primary ? QColor(0x3b, 0x74, 0xdb) : QColor(0x26, 0x26, 0x32),
-                            primary ? QColor(0x4f, 0x8c, 0xf6) : QColor(0x3c, 0x3c, 0x4c), 5);
+                            primary ? QColor(0x02, 0x84, 0xc7) : QColor(0x1e, 0x29, 0x3b),
+                            primary ? QColor(0x38, 0xbd, 0xf8) : QColor(0x33, 0x41, 0x55), 5);
                 painter->setPen(Qt::white);
                 painter->setFont(Theme::uiFont(9));
                 painter->drawText(r, Qt::AlignCenter, label);
@@ -309,7 +398,7 @@ void AgentEntryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         break;
     }
     case AgentEntryType::System: {
-        painter->setPen(QColor(0x7e, 0x7e, 0x8e));
+        painter->setPen(QColor(0x94, 0xa3, 0xb8));
         painter->setFont(Theme::uiFont(9));
         painter->drawText(rect, Qt::AlignLeft | Qt::AlignVCenter | Qt::TextWordWrap, entry.text);
         break;

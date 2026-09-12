@@ -298,54 +298,55 @@ QString Theme::applicationStyleSheet() {
 
         /* Antigravity panel */
         QWidget#antigravityPanel {
-            background-color: #18181c;
-            border-left: 1px solid #24242c;
+            background-color: #0b0f17;
+            border-left: 1px solid #1e293b;
         }
         QPlainTextEdit#agentComposer {
-            background-color: #1e1e24;
-            color: #eaeaf0;
-            border: 1px solid #2c2c36;
-            border-radius: 6px;
-            padding: 6px 8px;
-            font-size: 12px;
-            selection-background-color: #2d4268;
+            background-color: #1e293b;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            selection-background-color: #0284c7;
         }
         QPlainTextEdit#agentComposer:focus {
-            border-color: #4f8cf6;
+            border-color: #38bdf8;
         }
         QWidget#agentComposerRoot {
-            background: #151518;
-            border-top: 1px solid #24242c;
+            background: #0f172a;
+            border-top: 1px solid #1e293b;
         }
         QComboBox {
-            background-color: #1e1e24;
-            color: #d6d6e2;
-            border: 1px solid #2c2c36;
-            border-radius: 5px;
-            padding: 3px 8px;
-            font-size: 11px;
+            background-color: #1e293b;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 12px;
             min-width: 72px;
         }
-        QComboBox:hover { border-color: #4f8cf6; }
+        QComboBox:hover { border-color: #38bdf8; }
         QComboBox::drop-down { border: none; width: 16px; }
         QComboBox QAbstractItemView {
-            background: #1b1b20;
-            color: #eaeaf0;
-            border: 1px solid #2c2c36;
-            selection-background-color: #262632;
+            background: #0f172a;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            selection-background-color: #1e293b;
         }
         QWidget#agentMentionPopup, QListWidget {
-            background: #1b1b20;
-            color: #eaeaf0;
-            border: 1px solid #2c2c36;
+            background: #0f172a;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            border-radius: 6px;
         }
         QProgressBar {
-            background-color: #24242d;
+            background-color: #1e293b;
             border: none;
             border-radius: 2px;
         }
         QProgressBar::chunk {
-            background-color: #4f8cf6;
+            background-color: #38bdf8;
             border-radius: 2px;
         }
     )");
