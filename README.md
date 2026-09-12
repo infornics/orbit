@@ -4,7 +4,7 @@ Orbit is a fast, focused, and elegant native code and text editor built with **C
 
 It embraces purposeful minimalism: one project folder, an intuitive file explorer pane, an editor surface with line numbers and smart auto-indentation, and essential file actions—with zero bloat.
 
-![Orbit Preview](resources/icons/orbit.svg)
+![Orbit Preview](resources/icons/orbit_logo.jpg)
 
 ---
 
