@@ -5,28 +5,41 @@
 namespace Orbit {
 
 QIcon Icons::orbit(int size, const QColor &color) {
+    QIcon svgIcon(":/icons/orbit.svg");
+    if (!svgIcon.isNull() && !svgIcon.pixmap(size, size).isNull()) {
+        return svgIcon;
+    }
+
     QPixmap pixmap(size, size);
     pixmap.fill(Qt::transparent);
 
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    // Center dot
     const qreal center = size / 2.0;
-    const qreal dotRadius = size * 0.16;
-    painter.setBrush(color);
-    painter.setPen(Qt::NoPen);
-    painter.drawEllipse(QPointF(center, center), dotRadius, dotRadius);
-
-    // Orbit ellipse
-    painter.save();
-    painter.translate(center, center);
-    painter.rotate(-28.0);
-    QPen pen(color, qMax(1.5, size * 0.08));
+    QColor strokeColor = color.isValid() ? color : QColor(0, 242, 254);
+    QPen pen(strokeColor, qMax(2.0, size * 0.08));
+    pen.setCapStyle(Qt::RoundCap);
+    pen.setJoinStyle(Qt::RoundJoin);
     painter.setPen(pen);
     painter.setBrush(Qt::NoBrush);
-    painter.drawEllipse(QPointF(0, 0), size * 0.42, size * 0.20);
+
+    // Main Circle
+    painter.drawEllipse(QPointF(center, center), size * 0.30, size * 0.30);
+
+    // Tilted Orbital Ring
+    painter.save();
+    painter.translate(center, center);
+    painter.rotate(-35.0);
+    painter.drawEllipse(QPointF(0, 0), size * 0.42, size * 0.18);
     painter.restore();
+
+    // Code Bracket Angle (<)
+    QPainterPath path;
+    path.moveTo(center + size * 0.08, center - size * 0.14);
+    path.lineTo(center - size * 0.10, center);
+    path.lineTo(center + size * 0.08, center + size * 0.14);
+    painter.drawPath(path);
 
     return QIcon(pixmap);
 }

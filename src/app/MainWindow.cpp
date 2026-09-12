@@ -141,7 +141,7 @@ void MainWindow::setupUi() {
     welcomeLayout->setSpacing(16);
 
     auto *logoLabel = new QLabel(m_welcomeWidget);
-    logoLabel->setPixmap(Icons::orbit(64).pixmap(64, 64));
+    logoLabel->setPixmap(Icons::orbit(96).pixmap(96, 96));
     logoLabel->setAlignment(Qt::AlignCenter);
 
     auto *titleLabel = new QLabel("Orbit", m_welcomeWidget);
