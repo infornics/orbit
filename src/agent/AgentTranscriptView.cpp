@@ -6,6 +6,9 @@
 #include <QPainterPath>
 #include <QTextDocument>
 #include <QAbstractTextDocumentLayout>
+#include <QTextBlock>
+#include <QTextCursor>
+#include <QTextFragment>
 #include <QMouseEvent>
 #include <QScrollBar>
 #include <QTimer>
@@ -92,19 +95,22 @@ QTextDocument *AgentEntryDelegate::documentFor(const AgentEntry &entry, int widt
 
     // Modern high-contrast CSS stylesheet set BEFORE setMarkdown / setPlainText
     static const QString styleSheet = QStringLiteral(R"(
+        * {
+            color: #ffffff;
+        }
         body, p, li, td, th, div, span {
-            color: #e2e8f0;
+            color: #ffffff;
             font-size: 13px;
             line-height: 1.5;
         }
         h1, h2, h3, h4, h5, h6 {
-            color: #f8fafc;
-            font-weight: 600;
+            color: #ffffff;
+            font-weight: 700;
             margin-top: 12px;
             margin-bottom: 6px;
         }
-        h1 { font-size: 16px; color: #f8fafc; border-bottom: 1px solid #334155; padding-bottom: 4px; }
-        h2 { font-size: 15px; color: #f8fafc; border-bottom: 1px solid #1e293b; padding-bottom: 3px; }
+        h1 { font-size: 16px; color: #ffffff; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+        h2 { font-size: 15px; color: #ffffff; border-bottom: 1px solid #1e293b; padding-bottom: 3px; }
         h3 { font-size: 14px; color: #38bdf8; }
         h4 { font-size: 13px; color: #38bdf8; }
         a {
@@ -122,7 +128,7 @@ QTextDocument *AgentEntryDelegate::documentFor(const AgentEntry &entry, int widt
         }
         pre {
             background-color: #0f172a;
-            color: #e2e8f0;
+            color: #ffffff;
             font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
             font-size: 12px;
             padding: 8px 12px;
@@ -134,24 +140,24 @@ QTextDocument *AgentEntryDelegate::documentFor(const AgentEntry &entry, int widt
             margin-left: 16px;
             margin-top: 4px;
             margin-bottom: 8px;
-            color: #e2e8f0;
+            color: #ffffff;
         }
         li {
-            color: #e2e8f0;
+            color: #ffffff;
             margin-bottom: 4px;
         }
         strong, b {
             color: #ffffff;
-            font-weight: 600;
+            font-weight: 700;
         }
         em, i {
-            color: #94a3b8;
+            color: #cbd5e1;
         }
         blockquote {
             border-left: 3px solid #38bdf8;
             margin: 8px 0;
             padding-left: 10px;
-            color: #94a3b8;
+            color: #cbd5e1;
         }
         hr {
             border: none;
@@ -165,7 +171,7 @@ QTextDocument *AgentEntryDelegate::documentFor(const AgentEntry &entry, int widt
         }
         th {
             background-color: #1e293b;
-            color: #f8fafc;
+            color: #ffffff;
             font-weight: 600;
             padding: 6px 10px;
             border: 1px solid #334155;
@@ -173,7 +179,7 @@ QTextDocument *AgentEntryDelegate::documentFor(const AgentEntry &entry, int widt
         td {
             padding: 6px 10px;
             border: 1px solid #334155;
-            color: #e2e8f0;
+            color: #ffffff;
         }
     )");
 
@@ -187,6 +193,24 @@ QTextDocument *AgentEntryDelegate::documentFor(const AgentEntry &entry, int widt
         doc->setPlainText(entry.text);
     } else {
         doc->setMarkdown(entry.text);
+    }
+
+    // Post-process document fragments to guarantee bright white text for any uncolored text
+    for (QTextBlock block = doc->begin(); block.isValid(); block = block.next()) {
+        for (QTextBlock::iterator it = block.begin(); !it.atEnd(); ++it) {
+            QTextFragment fragment = it.fragment();
+            if (fragment.isValid()) {
+                QTextCharFormat fmt = fragment.charFormat();
+                QColor c = fmt.foreground().color();
+                if (c == Qt::black || c.lightness() < 140) {
+                    fmt.setForeground(QColor(0xff, 0xff, 0xff));
+                    QTextCursor cursor(doc);
+                    cursor.setPosition(fragment.position());
+                    cursor.setPosition(fragment.position() + fragment.length(), QTextCursor::KeepAnchor);
+                    cursor.setCharFormat(fmt);
+                }
+            }
+        }
     }
 
     m_docWidth.insert(entry.id, textWidth);
@@ -285,13 +309,21 @@ void AgentEntryDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
         drawRounded(painter, rect, QColor(0x1e, 0x29, 0x3b), QColor(0x33, 0x41, 0x55), 10);
         QTextDocument *doc = documentFor(entry, option.rect.width());
         painter->translate(rect.left() + 10, rect.top() + 8);
-        doc->drawContents(painter, QRectF(0, 0, rect.width() - 20, rect.height()));
+        QAbstractTextDocumentLayout::PaintContext ctx;
+        ctx.palette.setColor(QPalette::Text, QColor(0xff, 0xff, 0xff));
+        ctx.palette.setColor(QPalette::WindowText, QColor(0xff, 0xff, 0xff));
+        ctx.clip = QRectF(0, 0, rect.width() - 20, rect.height());
+        doc->documentLayout()->draw(painter, ctx);
         break;
     }
     case AgentEntryType::Agent: {
         QTextDocument *doc = documentFor(entry, option.rect.width());
         painter->translate(rect.left() + 4, rect.top() + 4);
-        doc->drawContents(painter, QRectF(0, 0, rect.width() - 8, rect.height()));
+        QAbstractTextDocumentLayout::PaintContext ctx;
+        ctx.palette.setColor(QPalette::Text, QColor(0xff, 0xff, 0xff));
+        ctx.palette.setColor(QPalette::WindowText, QColor(0xff, 0xff, 0xff));
+        ctx.clip = QRectF(0, 0, rect.width() - 8, rect.height());
+        doc->documentLayout()->draw(painter, ctx);
         break;
     }
     case AgentEntryType::Thought: {
