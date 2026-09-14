@@ -9,6 +9,7 @@
 #include <QGuiApplication>
 #include <QClipboard>
 #include <QFontDatabase>
+#include <QTextDocument>
 #include <QDebug>
 
 namespace Orbit {
@@ -78,9 +79,22 @@ TerminalWidget::TerminalWidget(QWidget *parent)
     m_defaultFormat.setForeground(QColor("#d4d4d8"));
     m_defaultFormat.setFont(font);
     m_currentFormat = m_defaultFormat;
+
+    initGrid(24, 80);
 }
 
 TerminalWidget::~TerminalWidget() = default;
+
+void TerminalWidget::initGrid(int rows, int cols) {
+    m_rows = qMax(3, rows);
+    m_cols = qMax(10, cols);
+    m_grid.clear();
+    for (int r = 0; r < m_rows; ++r) {
+        m_grid.append(QList<TerminalCell>(m_cols, {' ', m_defaultFormat}));
+    }
+    m_cursorRow = 0;
+    m_cursorCol = 0;
+}
 
 void TerminalWidget::setPtyProcess(PtyProcess *pty) {
     m_pty = pty;
@@ -94,10 +108,13 @@ void TerminalWidget::appendData(const QByteArray &data) {
     if (data.isEmpty()) return;
     QString text = QString::fromUtf8(data);
     processByteStream(text);
+    renderScreenToWidget();
 }
 
 void TerminalWidget::clearTerminal() {
     clear();
+    m_history.clear();
+    initGrid(m_rows, m_cols);
     m_currentFormat = m_defaultFormat;
     m_parserState = STATE_NORMAL;
     m_paramBuffer.clear();
@@ -259,15 +276,78 @@ void TerminalWidget::wheelEvent(QWheelEvent *event) {
 }
 
 void TerminalWidget::updatePtySize() {
-    if (!m_pty || !m_pty->isRunning()) return;
-
     int charWidth = fontMetrics().horizontalAdvance('M');
     int charHeight = fontMetrics().height();
 
     if (charWidth > 0 && charHeight > 0) {
         int cols = qMax(10, (width() - 16) / charWidth);
         int rows = qMax(3, (height() - 16) / charHeight);
-        m_pty->resizePty(rows, cols);
+
+        if (cols != m_cols || rows != m_rows) {
+            m_cols = cols;
+            m_rows = rows;
+            while (m_grid.size() < m_rows) {
+                m_grid.append(QList<TerminalCell>(m_cols, {' ', m_defaultFormat}));
+            }
+            while (m_grid.size() > m_rows) {
+                m_grid.removeLast();
+            }
+            for (int r = 0; r < m_grid.size(); ++r) {
+                while (m_grid[r].size() < m_cols) {
+                    m_grid[r].append({' ', m_defaultFormat});
+                }
+                if (m_grid[r].size() > m_cols) {
+                    m_grid[r] = m_grid[r].mid(0, m_cols);
+                }
+            }
+            m_cursorRow = qBound(0, m_cursorRow, m_rows - 1);
+            m_cursorCol = qBound(0, m_cursorCol, m_cols - 1);
+
+            if (m_pty && m_pty->isRunning()) {
+                m_pty->resizePty(m_rows, m_cols);
+            }
+            renderScreenToWidget();
+        }
+    }
+}
+
+void TerminalWidget::putChar(QChar ch) {
+    if (m_cursorCol >= m_cols) {
+        m_cursorCol = 0;
+        newLine();
+    }
+    if (m_cursorRow >= 0 && m_cursorRow < m_grid.size() && m_cursorCol >= 0 && m_cursorCol < m_cols) {
+        m_grid[m_cursorRow][m_cursorCol] = {ch, m_currentFormat};
+    }
+    m_cursorCol++;
+}
+
+void TerminalWidget::newLine() {
+    m_cursorRow++;
+    if (m_cursorRow >= m_rows) {
+        if (!m_grid.isEmpty()) {
+            m_history.append(m_grid.takeFirst());
+            if (m_history.size() > m_maxHistoryLines) {
+                m_history.removeFirst();
+            }
+        }
+        m_grid.append(QList<TerminalCell>(m_cols, {' ', m_defaultFormat}));
+        m_cursorRow = m_rows - 1;
+    }
+}
+
+void TerminalWidget::carriageReturn() {
+    m_cursorCol = 0;
+}
+
+void TerminalWidget::backspace() {
+    m_cursorCol = qMax(0, m_cursorCol - 1);
+}
+
+void TerminalWidget::tab() {
+    int nextTab = qMin(m_cols, (m_cursorCol / 8 + 1) * 8);
+    while (m_cursorCol < nextTab) {
+        putChar(' ');
     }
 }
 
@@ -345,7 +425,11 @@ void TerminalWidget::handleSgrSequence(const QStringList &params) {
     }
 }
 
-void TerminalWidget::handleCsiCommand(QChar cmd, const QString &params, QTextCursor &cursor) {
+void TerminalWidget::handleOscCommand(const QString &oscStr) {
+    Q_UNUSED(oscStr);
+}
+
+void TerminalWidget::handleCsiCommand(QChar cmd, const QString &params) {
     QStringList pList = params.split(';');
 
     auto getParam = [&pList](int idx, int defVal) -> int {
@@ -362,63 +446,81 @@ void TerminalWidget::handleCsiCommand(QChar cmd, const QString &params, QTextCur
     } else if (cmd == 'K') {
         // Erase in line
         int mode = getParam(0, 0);
-        if (mode == 0) {
-            // Erase from cursor to end of line
-            cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
-            cursor.removeSelectedText();
-        } else if (mode == 1) {
-            // Erase from start of line to cursor
-            cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::KeepAnchor);
-            cursor.removeSelectedText();
-        } else if (mode == 2) {
-            // Erase entire line
-            cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::MoveAnchor);
-            cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
-            cursor.removeSelectedText();
+        if (m_cursorRow >= 0 && m_cursorRow < m_grid.size()) {
+            if (mode == 0) {
+                for (int c = m_cursorCol; c < m_cols; ++c) {
+                    m_grid[m_cursorRow][c] = {' ', m_defaultFormat};
+                }
+            } else if (mode == 1) {
+                for (int c = 0; c <= qMin(m_cursorCol, m_cols - 1); ++c) {
+                    m_grid[m_cursorRow][c] = {' ', m_defaultFormat};
+                }
+            } else if (mode == 2) {
+                for (int c = 0; c < m_cols; ++c) {
+                    m_grid[m_cursorRow][c] = {' ', m_defaultFormat};
+                }
+            }
         }
     } else if (cmd == 'J') {
         // Erase in display
         int mode = getParam(0, 0);
         if (mode == 2 || mode == 3) {
-            clearTerminal();
-            cursor = textCursor();
+            m_history.clear();
+            initGrid(m_rows, m_cols);
         } else if (mode == 0) {
-            cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
-            cursor.removeSelectedText();
+            for (int r = m_cursorRow; r < m_rows; ++r) {
+                int startC = (r == m_cursorRow) ? m_cursorCol : 0;
+                for (int c = startC; c < m_cols; ++c) {
+                    m_grid[r][c] = {' ', m_defaultFormat};
+                }
+            }
         }
     } else if (cmd == 'A') {
         int count = getParam(0, 1);
-        cursor.movePosition(QTextCursor::Up, QTextCursor::MoveAnchor, count);
+        m_cursorRow = qMax(0, m_cursorRow - count);
     } else if (cmd == 'B') {
         int count = getParam(0, 1);
-        cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, count);
+        m_cursorRow = qMin(m_rows - 1, m_cursorRow + count);
     } else if (cmd == 'C') {
         int count = getParam(0, 1);
-        cursor.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, count);
+        m_cursorCol = qMin(m_cols - 1, m_cursorCol + count);
     } else if (cmd == 'D') {
         int count = getParam(0, 1);
-        cursor.movePosition(QTextCursor::Left, QTextCursor::MoveAnchor, count);
+        m_cursorCol = qMax(0, m_cursorCol - count);
     } else if (cmd == 'G' || cmd == '`') {
         int col = getParam(0, 1);
-        cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::MoveAnchor);
-        if (col > 1) {
-            cursor.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, col - 1);
-        }
+        m_cursorCol = qBound(0, col - 1, m_cols - 1);
+    } else if (cmd == 'H' || cmd == 'f') {
+        int row = getParam(0, 1);
+        int col = getParam(1, 1);
+        m_cursorRow = qBound(0, row - 1, m_rows - 1);
+        m_cursorCol = qBound(0, col - 1, m_cols - 1);
     } else if (cmd == 'P') {
-        // Delete characters
         int count = getParam(0, 1);
-        cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, count);
-        cursor.removeSelectedText();
+        if (m_cursorRow >= 0 && m_cursorRow < m_grid.size()) {
+            for (int c = m_cursorCol; c < m_cols; ++c) {
+                int src = c + count;
+                if (src < m_cols) {
+                    m_grid[m_cursorRow][c] = m_grid[m_cursorRow][src];
+                } else {
+                    m_grid[m_cursorRow][c] = {' ', m_defaultFormat};
+                }
+            }
+        }
+    } else if (cmd == '@') {
+        int count = getParam(0, 1);
+        if (m_cursorRow >= 0 && m_cursorRow < m_grid.size()) {
+            for (int c = m_cols - 1; c >= m_cursorCol + count; --c) {
+                m_grid[m_cursorRow][c] = m_grid[m_cursorRow][c - count];
+            }
+            for (int c = m_cursorCol; c < qMin(m_cols, m_cursorCol + count); ++c) {
+                m_grid[m_cursorRow][c] = {' ', m_defaultFormat};
+            }
+        }
     }
 }
 
 void TerminalWidget::processByteStream(const QString &text) {
-    QTextCursor cursor = textCursor();
-    // Ensure we place cursor at end if user is scrolled to bottom
-    if (verticalScrollBar()->value() >= verticalScrollBar()->maximum() - 5) {
-        cursor.movePosition(QTextCursor::End, QTextCursor::MoveAnchor);
-    }
-
     for (int i = 0; i < text.length(); ++i) {
         QChar ch = text[i];
 
@@ -428,32 +530,17 @@ void TerminalWidget::processByteStream(const QString &text) {
                 m_parserState = STATE_ESC;
                 m_paramBuffer.clear();
             } else if (ch == '\r') {
-                cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::MoveAnchor);
+                carriageReturn();
             } else if (ch == '\n') {
-                cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::MoveAnchor);
-                cursor.insertBlock(m_blockFormat, m_currentFormat);
+                newLine();
             } else if (ch == '\b') {
-                if (!cursor.atBlockStart()) {
-                    cursor.movePosition(QTextCursor::Left, QTextCursor::MoveAnchor);
-                }
+                backspace();
             } else if (ch == '\t') {
-                int col = cursor.positionInBlock();
-                int spaces = 4 - (col % 4);
-                for (int s = 0; s < spaces; ++s) {
-                    if (!cursor.atBlockEnd()) {
-                        cursor.deleteChar();
-                    }
-                    cursor.setCharFormat(m_currentFormat);
-                    cursor.insertText(" ");
-                }
+                tab();
             } else if (ch == '\a') {
                 // Bell - ignore
             } else {
-                if (!cursor.atBlockEnd()) {
-                    cursor.deleteChar();
-                }
-                cursor.setCharFormat(m_currentFormat);
-                cursor.insertText(QString(ch));
+                putChar(ch);
             }
             break;
 
@@ -466,6 +553,14 @@ void TerminalWidget::processByteStream(const QString &text) {
                 m_oscBuffer.clear();
             } else if (ch == '(' || ch == ')' || ch == '#' || ch == '%') {
                 m_parserState = STATE_CHARSET;
+            } else if (ch == '7') {
+                m_savedRow = m_cursorRow;
+                m_savedCol = m_cursorCol;
+                m_parserState = STATE_NORMAL;
+            } else if (ch == '8') {
+                m_cursorRow = qBound(0, m_savedRow, m_rows - 1);
+                m_cursorCol = qBound(0, m_savedCol, m_cols - 1);
+                m_parserState = STATE_NORMAL;
             } else {
                 m_parserState = STATE_NORMAL;
             }
@@ -477,9 +572,12 @@ void TerminalWidget::processByteStream(const QString &text) {
 
         case STATE_OSC:
             if (ch == '\a') {
+                handleOscCommand(m_oscBuffer);
                 m_parserState = STATE_NORMAL;
                 m_oscBuffer.clear();
             } else if (ch == '\\' && m_oscBuffer.endsWith('\x1b')) {
+                m_oscBuffer.chop(1);
+                handleOscCommand(m_oscBuffer);
                 m_parserState = STATE_NORMAL;
                 m_oscBuffer.clear();
             } else {
@@ -492,7 +590,7 @@ void TerminalWidget::processByteStream(const QString &text) {
             if ((u >= '0' && u <= '9') || ch == ';' || ch == '?' || ch == '>' || ch == '!' || ch == ' ') {
                 m_paramBuffer.append(ch);
             } else if (u >= 0x40 && u <= 0x7E) {
-                handleCsiCommand(ch, m_paramBuffer, cursor);
+                handleCsiCommand(ch, m_paramBuffer);
                 m_parserState = STATE_NORMAL;
                 m_paramBuffer.clear();
             } else if (ch == '\x1b') {
@@ -506,8 +604,72 @@ void TerminalWidget::processByteStream(const QString &text) {
         }
         }
     }
+}
 
-    setTextCursor(cursor);
+void TerminalWidget::renderScreenToWidget() {
+    QTextDocument *doc = document();
+    doc->clear();
+    QTextCursor cursor(doc);
+
+    // Render history lines
+    for (int h = 0; h < m_history.size(); ++h) {
+        const auto &row = m_history[h];
+        int lastNonSpace = row.size() - 1;
+        while (lastNonSpace >= 0 && row[lastNonSpace].ch == ' ' && row[lastNonSpace].format == m_defaultFormat) {
+            lastNonSpace--;
+        }
+
+        for (int c = 0; c <= lastNonSpace && c < row.size(); ++c) {
+            cursor.setCharFormat(row[c].format);
+            cursor.insertText(QString(row[c].ch));
+        }
+        cursor.insertBlock();
+    }
+
+    // Determine last active row in m_grid so we don't insert empty rows below prompt
+    int lastActiveRow = m_grid.size() - 1;
+    while (lastActiveRow > m_cursorRow) {
+        bool hasText = false;
+        for (const auto &cell : m_grid[lastActiveRow]) {
+            if (cell.ch != ' ' || cell.format != m_defaultFormat) {
+                hasText = true;
+                break;
+            }
+        }
+        if (hasText) break;
+        lastActiveRow--;
+    }
+
+    // Render grid rows up to lastActiveRow
+    for (int r = 0; r <= lastActiveRow && r < m_grid.size(); ++r) {
+        const auto &row = m_grid[r];
+        int lastNonSpace = row.size() - 1;
+        while (lastNonSpace >= 0 && row[lastNonSpace].ch == ' ' && row[lastNonSpace].format == m_defaultFormat) {
+            lastNonSpace--;
+        }
+
+        if (r == m_cursorRow) {
+            lastNonSpace = qMax(lastNonSpace, m_cursorCol);
+        }
+
+        for (int c = 0; c <= lastNonSpace && c < row.size(); ++c) {
+            QTextCharFormat fmt = row[c].format;
+
+            // Electric blue cursor block highlight
+            if (r == m_cursorRow && c == m_cursorCol) {
+                fmt.setBackground(QColor("#4f8cf6"));
+                fmt.setForeground(QColor("#ffffff"));
+            }
+
+            cursor.setCharFormat(fmt);
+            cursor.insertText(QString(row[c].ch));
+        }
+
+        if (r < lastActiveRow) {
+            cursor.insertBlock();
+        }
+    }
+
     verticalScrollBar()->setValue(verticalScrollBar()->maximum());
 }
 

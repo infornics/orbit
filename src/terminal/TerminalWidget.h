@@ -3,11 +3,16 @@
 #include <QPlainTextEdit>
 #include <QColor>
 #include <QTextCharFormat>
-#include <QTextBlockFormat>
+#include <QList>
 
 namespace Orbit {
 
 class PtyProcess;
+
+struct TerminalCell {
+    QChar ch = ' ';
+    QTextCharFormat format;
+};
 
 class TerminalWidget : public QPlainTextEdit {
     Q_OBJECT
@@ -44,19 +49,40 @@ private:
     };
 
     void processByteStream(const QString &text);
+    void putChar(QChar ch);
+    void newLine();
+    void carriageReturn();
+    void backspace();
+    void tab();
+
     void handleSgrSequence(const QStringList &params);
-    void handleCsiCommand(QChar cmd, const QString &params, QTextCursor &cursor);
+    void handleCsiCommand(QChar cmd, const QString &params);
+    void handleOscCommand(const QString &oscStr);
     static QColor parseAnsi256Color(int index);
+
     void updatePtySize();
+    void renderScreenToWidget();
+    void initGrid(int rows, int cols);
 
     PtyProcess *m_pty = nullptr;
     QTextCharFormat m_currentFormat;
     QTextCharFormat m_defaultFormat;
-    QTextBlockFormat m_blockFormat;
 
     ParserState m_parserState = STATE_NORMAL;
     QString m_paramBuffer;
     QString m_oscBuffer;
+
+    int m_rows = 24;
+    int m_cols = 80;
+    int m_cursorRow = 0;
+    int m_cursorCol = 0;
+
+    QList<QList<TerminalCell>> m_history;
+    QList<QList<TerminalCell>> m_grid;
+    int m_maxHistoryLines = 1000;
+
+    int m_savedRow = 0;
+    int m_savedCol = 0;
 };
 
 } // namespace Orbit

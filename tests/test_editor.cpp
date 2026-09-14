@@ -128,6 +128,7 @@ void OrbitTests::testDirtyStateAndScreenshot() {
     QTextCursor cursor = editor->textCursor();
     cursor.movePosition(QTextCursor::Start);
     cursor.insertText("# Orbit Project\n");
+    editor->setTextCursor(cursor);
 
     QTest::qWait(100);
 
@@ -143,8 +144,10 @@ void OrbitTests::testDirtyStateAndScreenshot() {
     QVERIFY(!window.windowTitle().contains("•"));
 
     // Revert edit manually (typing and then deleting)
+    cursor = editor->textCursor();
     cursor.movePosition(QTextCursor::Start);
     cursor.insertText("xyz");
+    editor->setTextCursor(cursor);
     QTest::qWait(100);
     QVERIFY(window.windowTitle().contains("•"));
 
@@ -152,6 +155,7 @@ void OrbitTests::testDirtyStateAndScreenshot() {
     for (int i = 0; i < 3; ++i) {
         cursor.deleteChar();
     }
+    editor->setTextCursor(cursor);
     QTest::qWait(100);
     QVERIFY(!window.windowTitle().contains("•"));
 }
