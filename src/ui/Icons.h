@@ -3,6 +3,7 @@
 #include <QIcon>
 #include <QPixmap>
 #include <QColor>
+#include <QString>
 
 namespace Orbit {
 
@@ -18,6 +19,10 @@ public:
     static QIcon check(int size = 14, const QColor &color = QColor(0x4f, 0x8c, 0xf6));
     static QIcon antigravity(int size = 16, const QColor &color = QColor(0x4f, 0x8c, 0xf6));
     static QIcon terminal(int size = 16, const QColor &color = QColor(0x4f, 0x8c, 0xf6));
+
+    // File-type & Folder specific vector icon generators (Material UI / VS Code styled)
+    static QIcon fileForPath(const QString &fileName, int size = 16);
+    static QIcon folderForDir(const QString &dirName, bool isOpen = false, int size = 16);
 };
 
 } // namespace Orbit

@@ -282,4 +282,178 @@ QIcon Icons::terminal(int size, const QColor &color) {
     return QIcon(pixmap);
 }
 
+QIcon Icons::fileForPath(const QString &fileName, int size) {
+    QPixmap pixmap(size, size);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    QString nameLower = fileName.toLower();
+    QString ext;
+    int dotIdx = nameLower.lastIndexOf('.');
+    if (dotIdx != -1) {
+        ext = nameLower.mid(dotIdx + 1);
+    }
+
+    QColor fileColor("#94a3b8"); // default slate
+    QString label;
+
+    if (nameLower == "cmakelists.txt" || ext == "cmake") {
+        fileColor = QColor("#34d399"); // Emerald Green
+        label = "CM";
+    } else if (ext == "cpp" || ext == "cxx" || ext == "cc" || ext == "c") {
+        fileColor = QColor("#38bdf8"); // Cyan Blue
+        label = "C+";
+    } else if (ext == "h" || ext == "hpp" || ext == "hh") {
+        fileColor = QColor("#c084fc"); // Violet Purple
+        label = "H";
+    } else if (ext == "md" || ext == "markdown") {
+        fileColor = QColor("#60a5fa"); // Sky Blue
+        label = "M↓";
+    } else if (ext == "json") {
+        fileColor = QColor("#fbbf24"); // Amber Gold
+        label = "{}";
+    } else if (ext == "py" || ext == "ipynb") {
+        fileColor = QColor("#3b82f6"); // Python Blue
+        label = "PY";
+    } else if (ext == "js" || ext == "jsx" || ext == "mjs") {
+        fileColor = QColor("#facc15"); // Yellow
+        label = "JS";
+    } else if (ext == "ts" || ext == "tsx") {
+        fileColor = QColor("#3b82f6"); // TS Blue
+        label = "TS";
+    } else if (ext == "html" || ext == "htm") {
+        fileColor = QColor("#f97316"); // Orange
+        label = "<>";
+    } else if (ext == "css" || ext == "scss" || ext == "sass" || ext == "less") {
+        fileColor = QColor("#ec4899"); // Hot Pink
+        label = "#";
+    } else if (nameLower.startsWith(".git") || ext == "yml" || ext == "yaml" || ext == "env") {
+        fileColor = QColor("#f97316"); // Git Coral
+        label = "⚙";
+    } else if (ext == "sh" || ext == "bash" || ext == "zsh" || ext == "fish") {
+        fileColor = QColor("#22c55e"); // Terminal Green
+        label = ">_";
+    } else if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "svg" || ext == "gif" || ext == "webp") {
+        fileColor = QColor("#f43f5e"); // Rose Pink
+        label = "IMG";
+    }
+
+    // Sheet background
+    const qreal m = size * 0.12;
+    const qreal w = size - 2 * m;
+    const qreal h = size - 2 * m;
+
+    QPainterPath sheet;
+    qreal fold = w * 0.32;
+    sheet.moveTo(m, m);
+    sheet.lineTo(m + w - fold, m);
+    sheet.lineTo(m + w, m + fold);
+    sheet.lineTo(m + w, m + h);
+    sheet.lineTo(m, m + h);
+    sheet.closeSubpath();
+
+    QPen pen(fileColor, qMax(1.3, size * 0.08));
+    pen.setJoinStyle(Qt::RoundJoin);
+    pen.setCapStyle(Qt::RoundCap);
+    painter.setPen(pen);
+
+    QColor fillCol = fileColor;
+    fillCol.setAlpha(35);
+    painter.setBrush(fillCol);
+    painter.drawPath(sheet);
+
+    // Folded corner line
+    QPainterPath foldPath;
+    foldPath.moveTo(m + w - fold, m);
+    foldPath.lineTo(m + w - fold, m + fold);
+    foldPath.lineTo(m + w, m + fold);
+    painter.drawPath(foldPath);
+
+    // Label or Badge
+    if (!label.isEmpty()) {
+        painter.setFont(QFont("sans-serif", qMax(6, int(size * 0.38)), QFont::Bold));
+        painter.setPen(fileColor);
+        painter.drawText(QRectF(m, m + h * 0.25, w, h * 0.7), Qt::AlignCenter, label);
+    }
+
+    return QIcon(pixmap);
+}
+
+QIcon Icons::folderForDir(const QString &dirName, bool isOpen, int size) {
+    QPixmap pixmap(size, size);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    QString nameLower = dirName.toLower();
+    QColor folderColor("#4f8cf6"); // Default Orbit Blue
+
+    if (nameLower == "src" || nameLower == "app" || nameLower == "lib" || nameLower == "core") {
+        folderColor = QColor("#38bdf8"); // Cyan
+    } else if (nameLower == "test" || nameLower == "tests" || nameLower == "spec") {
+        folderColor = QColor("#c084fc"); // Purple
+    } else if (nameLower == "doc" || nameLower == "docs") {
+        folderColor = QColor("#34d399"); // Emerald
+    } else if (nameLower == "build" || nameLower == "dist" || nameLower == "out" || nameLower == "target") {
+        folderColor = QColor("#fbbf24"); // Amber
+    } else if (nameLower == "ui" || nameLower == "components" || nameLower == "views") {
+        folderColor = QColor("#ec4899"); // Pink
+    } else if (nameLower == "resources" || nameLower == "assets" || nameLower == "public" || nameLower == "icons") {
+        folderColor = QColor("#06b6d4"); // Cyan
+    } else if (nameLower.startsWith(".git") || nameLower == ".agents" || nameLower == ".gemini") {
+        folderColor = QColor("#f97316"); // Coral
+    }
+
+    QPen pen(folderColor, qMax(1.4, size * 0.09));
+    pen.setJoinStyle(Qt::RoundJoin);
+    pen.setCapStyle(Qt::RoundCap);
+    painter.setPen(pen);
+
+    QColor fillCol = folderColor;
+    fillCol.setAlpha(isOpen ? 45 : 30);
+    painter.setBrush(fillCol);
+
+    const qreal m = size * 0.10;
+    const qreal w = size - 2 * m;
+    const qreal h = size - 2 * m;
+
+    if (!isOpen) {
+        // Closed Folder
+        QPainterPath path;
+        path.moveTo(m, m + h * 0.2);
+        path.lineTo(m + w * 0.38, m + h * 0.2);
+        path.lineTo(m + w * 0.48, m + h * 0.36);
+        path.lineTo(m + w, m + h * 0.36);
+        path.lineTo(m + w, m + h);
+        path.lineTo(m, m + h);
+        path.closeSubpath();
+        painter.drawPath(path);
+    } else {
+        // Open Folder with dynamic front flap
+        QPainterPath back;
+        back.moveTo(m, m + h * 0.85);
+        back.lineTo(m, m + h * 0.2);
+        back.lineTo(m + w * 0.38, m + h * 0.2);
+        back.lineTo(m + w * 0.48, m + h * 0.36);
+        back.lineTo(m + w * 0.85, m + h * 0.36);
+        back.lineTo(m + w * 0.85, m + h * 0.55);
+        painter.drawPath(back);
+
+        QPainterPath front;
+        front.moveTo(m, m + h * 0.48);
+        front.lineTo(m + w * 0.85, m + h * 0.48);
+        front.lineTo(m + w, m + h);
+        front.lineTo(m + w * 0.15, m + h);
+        front.closeSubpath();
+        fillCol.setAlpha(60);
+        painter.setBrush(fillCol);
+        painter.drawPath(front);
+    }
+
+    return QIcon(pixmap);
+}
+
 } // namespace Orbit

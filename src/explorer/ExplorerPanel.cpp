@@ -18,6 +18,22 @@
 
 namespace Orbit {
 
+OrbitFileSystemModel::OrbitFileSystemModel(QObject *parent)
+    : QFileSystemModel(parent) {
+}
+
+QVariant OrbitFileSystemModel::data(const QModelIndex &index, int role) const {
+    if (role == Qt::DecorationRole && index.column() == 0) {
+        QFileInfo info = fileInfo(index);
+        if (info.isDir()) {
+            bool isOpen = m_treeView && m_treeView->isExpanded(index);
+            return Icons::folderForDir(info.fileName(), isOpen, 16);
+        }
+        return Icons::fileForPath(info.fileName(), 16);
+    }
+    return QFileSystemModel::data(index, role);
+}
+
 ExplorerTreeView::ExplorerTreeView(QWidget *parent)
     : QTreeView(parent) {
     setMouseTracking(true);
@@ -260,10 +276,11 @@ void ExplorerPanel::setupUi() {
     m_stackedWidget->addWidget(emptyWidget);
 
     // --- Page 1: Tree View ---
-    m_model = new QFileSystemModel(this);
+    m_model = new OrbitFileSystemModel(this);
     m_model->setFilter(QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
 
     m_treeView = new ExplorerTreeView(m_stackedWidget);
+    m_model->setTreeView(m_treeView);
     m_treeView->setModel(m_model);
     m_treeView->setHeaderHidden(true);
     m_treeView->setAnimated(true);

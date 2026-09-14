@@ -2,15 +2,28 @@
 
 #include <QWidget>
 #include <QTreeView>
+#include <QFileSystemModel>
 #include <QString>
 #include <QModelIndex>
 
-class QFileSystemModel;
 class QStackedWidget;
 class QLabel;
 class QPushButton;
 
 namespace Orbit {
+
+class OrbitFileSystemModel : public QFileSystemModel {
+    Q_OBJECT
+
+public:
+    explicit OrbitFileSystemModel(QObject *parent = nullptr);
+    void setTreeView(QTreeView *treeView) { m_treeView = treeView; }
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+
+private:
+    QTreeView *m_treeView = nullptr;
+};
 
 class ExplorerTreeView : public QTreeView {
     Q_OBJECT
@@ -51,7 +64,7 @@ private:
     void setupUi();
 
     QString m_currentFolderPath;
-    QFileSystemModel *m_model;
+    OrbitFileSystemModel *m_model;
     ExplorerTreeView *m_treeView;
     QStackedWidget *m_stackedWidget;
     QLabel *m_folderTitleLabel;
