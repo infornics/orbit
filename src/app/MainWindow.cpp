@@ -371,10 +371,9 @@ void MainWindow::createShortcuts() {
         m_editor->setEditorFontSize(m_editor->editorFontSize() + 1);
     });
 
-    // Terminal shortcuts
+    // Supplementary terminal shortcuts
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_QuoteLeft), this, [this]() { onToggleTerminal(); });
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_AsciiTilde), this, [this]() { onToggleTerminal(); });
-    new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T), this, [this]() { onNewTerminalTab(); });
 }
 
 void MainWindow::updateTitleAndHeader() {

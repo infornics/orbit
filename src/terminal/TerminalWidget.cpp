@@ -9,7 +9,6 @@
 #include <QGuiApplication>
 #include <QClipboard>
 #include <QFontDatabase>
-#include <QTextBlock>
 #include <QDebug>
 
 namespace Orbit {
@@ -94,9 +93,7 @@ void TerminalWidget::setPtyProcess(PtyProcess *pty) {
 void TerminalWidget::appendData(const QByteArray &data) {
     if (data.isEmpty()) return;
     QString text = QString::fromUtf8(data);
-    processAnsiStream(text);
-
-    verticalScrollBar()->setValue(verticalScrollBar()->maximum());
+    processByteStream(text);
 }
 
 void TerminalWidget::clearTerminal() {
@@ -111,6 +108,7 @@ void TerminalWidget::zoomInFont(int range) {
     QFont f = font();
     f.setPointSizeF(qMin(32.0, f.pointSizeF() + range));
     setFont(f);
+    m_defaultFormat.setFont(f);
     updatePtySize();
 }
 
@@ -118,6 +116,7 @@ void TerminalWidget::zoomOutFont(int range) {
     QFont f = font();
     f.setPointSizeF(qMax(6.0, f.pointSizeF() - range));
     setFont(f);
+    m_defaultFormat.setFont(f);
     updatePtySize();
 }
 
@@ -125,6 +124,7 @@ void TerminalWidget::resetZoomFont() {
     QFont f = font();
     f.setPointSizeF(10.0);
     setFont(f);
+    m_defaultFormat.setFont(f);
     updatePtySize();
 }
 
@@ -345,11 +345,6 @@ void TerminalWidget::handleSgrSequence(const QStringList &params) {
     }
 }
 
-void TerminalWidget::handleOscCommand(const QString &oscStr) {
-    Q_UNUSED(oscStr);
-    // OSC sequences like set window title \033]0;title\007 are safely consumed and stripped.
-}
-
 void TerminalWidget::handleCsiCommand(QChar cmd, const QString &params, QTextCursor &cursor) {
     QStringList pList = params.split(';');
 
@@ -392,36 +387,20 @@ void TerminalWidget::handleCsiCommand(QChar cmd, const QString &params, QTextCur
             cursor.removeSelectedText();
         }
     } else if (cmd == 'A') {
-        // Cursor Up
         int count = getParam(0, 1);
         cursor.movePosition(QTextCursor::Up, QTextCursor::MoveAnchor, count);
     } else if (cmd == 'B') {
-        // Cursor Down
         int count = getParam(0, 1);
         cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, count);
     } else if (cmd == 'C') {
-        // Cursor Right
         int count = getParam(0, 1);
         cursor.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, count);
     } else if (cmd == 'D') {
-        // Cursor Left
         int count = getParam(0, 1);
         cursor.movePosition(QTextCursor::Left, QTextCursor::MoveAnchor, count);
     } else if (cmd == 'G' || cmd == '`') {
-        // Cursor Column
         int col = getParam(0, 1);
         cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::MoveAnchor);
-        if (col > 1) {
-            cursor.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, col - 1);
-        }
-    } else if (cmd == 'H' || cmd == 'f') {
-        // Cursor Position row;col
-        int row = getParam(0, 1);
-        int col = getParam(1, 1);
-        cursor.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor);
-        for (int r = 1; r < row; ++r) {
-            cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor);
-        }
         if (col > 1) {
             cursor.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, col - 1);
         }
@@ -430,22 +409,12 @@ void TerminalWidget::handleCsiCommand(QChar cmd, const QString &params, QTextCur
         int count = getParam(0, 1);
         cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, count);
         cursor.removeSelectedText();
-    } else if (cmd == 'X') {
-        // Erase characters (overwrite with spaces)
-        int count = getParam(0, 1);
-        for (int i = 0; i < count; ++i) {
-            if (!cursor.atBlockEnd()) {
-                cursor.deleteChar();
-            }
-            cursor.setCharFormat(m_currentFormat);
-            cursor.insertText(" ");
-        }
     }
 }
 
-void TerminalWidget::processAnsiStream(const QString &text) {
+void TerminalWidget::processByteStream(const QString &text) {
     QTextCursor cursor = textCursor();
-    // Ensure we start cursor at end if we were at end previously
+    // Ensure we place cursor at end if user is scrolled to bottom
     if (verticalScrollBar()->value() >= verticalScrollBar()->maximum() - 5) {
         cursor.movePosition(QTextCursor::End, QTextCursor::MoveAnchor);
     }
@@ -459,22 +428,18 @@ void TerminalWidget::processAnsiStream(const QString &text) {
                 m_parserState = STATE_ESC;
                 m_paramBuffer.clear();
             } else if (ch == '\r') {
-                // Carriage Return: move cursor to start of current block (line)
                 cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::MoveAnchor);
             } else if (ch == '\n') {
-                // Line Feed: move cursor to end of current line and insert new line block
                 cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::MoveAnchor);
                 cursor.insertBlock(m_blockFormat, m_currentFormat);
             } else if (ch == '\b') {
-                // Backspace character: move cursor left 1 char
                 if (!cursor.atBlockStart()) {
                     cursor.movePosition(QTextCursor::Left, QTextCursor::MoveAnchor);
                 }
             } else if (ch == '\t') {
-                // Tab character: move to next 4-space tab stop
-                int currentCol = cursor.positionInBlock();
-                int spacesToAdd = 4 - (currentCol % 4);
-                for (int s = 0; s < spacesToAdd; ++s) {
+                int col = cursor.positionInBlock();
+                int spaces = 4 - (col % 4);
+                for (int s = 0; s < spaces; ++s) {
                     if (!cursor.atBlockEnd()) {
                         cursor.deleteChar();
                     }
@@ -484,8 +449,6 @@ void TerminalWidget::processAnsiStream(const QString &text) {
             } else if (ch == '\a') {
                 // Bell - ignore
             } else {
-                // Normal printable character
-                // If cursor is not at end of line (in readline overwrite state), overwrite character
                 if (!cursor.atBlockEnd()) {
                     cursor.deleteChar();
                 }
@@ -503,30 +466,20 @@ void TerminalWidget::processAnsiStream(const QString &text) {
                 m_oscBuffer.clear();
             } else if (ch == '(' || ch == ')' || ch == '#' || ch == '%') {
                 m_parserState = STATE_CHARSET;
-            } else if (ch == '7') {
-                m_savedBlock = cursor.blockNumber();
-                m_savedCol = cursor.positionInBlock();
-                m_parserState = STATE_NORMAL;
-            } else if (ch == '8') {
-                m_parserState = STATE_NORMAL;
             } else {
                 m_parserState = STATE_NORMAL;
             }
             break;
 
         case STATE_CHARSET:
-            // Consume designation character (e.g., 'B' for ASCII) and return to normal
             m_parserState = STATE_NORMAL;
             break;
 
         case STATE_OSC:
             if (ch == '\a') {
-                handleOscCommand(m_oscBuffer);
                 m_parserState = STATE_NORMAL;
                 m_oscBuffer.clear();
             } else if (ch == '\\' && m_oscBuffer.endsWith('\x1b')) {
-                m_oscBuffer.chop(1);
-                handleOscCommand(m_oscBuffer);
                 m_parserState = STATE_NORMAL;
                 m_oscBuffer.clear();
             } else {
@@ -539,7 +492,6 @@ void TerminalWidget::processAnsiStream(const QString &text) {
             if ((u >= '0' && u <= '9') || ch == ';' || ch == '?' || ch == '>' || ch == '!' || ch == ' ') {
                 m_paramBuffer.append(ch);
             } else if (u >= 0x40 && u <= 0x7E) {
-                // CSI Command execution
                 handleCsiCommand(ch, m_paramBuffer, cursor);
                 m_parserState = STATE_NORMAL;
                 m_paramBuffer.clear();
@@ -556,6 +508,7 @@ void TerminalWidget::processAnsiStream(const QString &text) {
     }
 
     setTextCursor(cursor);
+    verticalScrollBar()->setValue(verticalScrollBar()->maximum());
 }
 
 } // namespace Orbit
