@@ -55,6 +55,15 @@ set(AGENT_SOURCES
     src/agent/AgentTranscriptView.cpp
 )
 
+set(TERMINAL_SOURCES
+    src/terminal/PtyProcess.h
+    src/terminal/PtyProcess.cpp
+    src/terminal/TerminalWidget.h
+    src/terminal/TerminalWidget.cpp
+    src/terminal/TerminalPanel.h
+    src/terminal/TerminalPanel.cpp
+)
+
 set(RESOURCES
     resources/resources.qrc
 )
@@ -65,14 +74,18 @@ set(PROJECT_SOURCES
     ${EXPLORER_SOURCES}
     ${UI_SOURCES}
     ${AGENT_SOURCES}
+    ${TERMINAL_SOURCES}
     ${RESOURCES}
 )
+
+find_library(UTIL_LIB util)
 
 qt_add_executable(orbit ${PROJECT_SOURCES})
 
 target_link_libraries(orbit PRIVATE
     Qt6::Widgets
     Qt6::Network
+    $<$<BOOL:${UTIL_LIB}>:${UTIL_LIB}>
 )
 target_include_directories(orbit PRIVATE src)
 
@@ -117,6 +130,7 @@ if(Qt6Test_FOUND)
         src/agent/AgentComposer.cpp
         src/agent/AgentTranscriptView.h
         src/agent/AgentTranscriptView.cpp
+        ${TERMINAL_SOURCES}
         ${RESOURCES}
     )
     target_include_directories(orbit_tests PRIVATE src)
@@ -124,8 +138,25 @@ if(Qt6Test_FOUND)
         Qt6::Widgets
         Qt6::Network
         Qt6::Test
+        $<$<BOOL:${UTIL_LIB}>:${UTIL_LIB}>
     )
     add_test(NAME OrbitTests COMMAND orbit_tests)
+
+    qt_add_executable(orbit_terminal_tests
+        tests/test_terminal.cpp
+        ${TERMINAL_SOURCES}
+        src/ui/Icons.h
+        src/ui/Icons.cpp
+        ${RESOURCES}
+    )
+    target_include_directories(orbit_terminal_tests PRIVATE src)
+    target_link_libraries(orbit_terminal_tests PRIVATE
+        Qt6::Widgets
+        Qt6::Network
+        Qt6::Test
+        $<$<BOOL:${UTIL_LIB}>:${UTIL_LIB}>
+    )
+    add_test(NAME OrbitTerminalTests COMMAND orbit_terminal_tests)
 endif()
 
 # ==============================================================================

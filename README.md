@@ -33,6 +33,12 @@ It embraces purposeful minimalism: one project folder, an intuitive file explore
   - Refined electric blue accents with low-contrast borders.
   - Subdued status bar reporting encoding, line endings, indentation, and live `Ln, Col` cursor position.
   - Remembers window geometry, splitter sizes, and last opened folder across sessions via `QSettings`.
+- **Integrated Terminal**:
+  - Embedded native Linux POSIX PTY shell session (`$SHELL` / `/bin/bash`).
+  - Toggle visibility with `Ctrl + ~` or `Ctrl + J`.
+  - Multi-tab support (`Ctrl + Shift + T` to open new tabs).
+  - Automatically initializes working directory to current project folder.
+  - ANSI 16/256/TrueColor syntax formatting, autoscroll, zoom support, and dark terminal aesthetic.
 - **Google Antigravity**:
   - Native side panel that installs and runs Google's official Antigravity ACP server (`agy_acp_server`).
   - Same agent harness used by the VS Code, Zed, JetBrains, and Xcode extensions — Orbit cannot load those IDE plugins directly, so it speaks the Agent Client Protocol instead.
@@ -52,6 +58,8 @@ It embraces purposeful minimalism: one project folder, an intuitive file explore
 | `Ctrl + W` | Close File |
 | `Ctrl + B` | Toggle Explorer Sidebar |
 | `Ctrl + L` | Toggle Antigravity panel |
+| `Ctrl + ~` / `Ctrl + J` | Toggle Integrated Terminal |
+| `Ctrl + Shift + T` | New Terminal Tab |
 | `Ctrl + +` / `Ctrl + =` | Zoom In Font |
 | `Ctrl + -` | Zoom Out Font |
 | `Ctrl + 0` | Reset Zoom |

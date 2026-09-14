@@ -2,6 +2,8 @@
 #include "explorer/ExplorerPanel.h"
 #include "editor/CodeEditor.h"
 #include "agent/AntigravityPanel.h"
+#include "terminal/TerminalPanel.h"
+#include "terminal/TerminalWidget.h"
 #include "ui/Icons.h"
 
 #include <QApplication>
@@ -36,6 +38,7 @@ namespace Orbit {
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
+    , m_mainSplitter(nullptr)
     , m_splitter(nullptr)
     , m_explorerPanel(nullptr)
     , m_editorContainer(nullptr)
@@ -46,6 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_welcomeWidget(nullptr)
     , m_editor(nullptr)
     , m_antigravityPanel(nullptr)
+    , m_terminalPanel(nullptr)
     , m_statusMsgLabel(nullptr)
     , m_languageLabel(nullptr)
     , m_encodingLabel(nullptr)
@@ -86,8 +90,12 @@ void MainWindow::setupUi() {
     rootLayout->setContentsMargins(0, 0, 0, 0);
     rootLayout->setSpacing(0);
 
-    // Horizontal splitter dividing Explorer and Editor
-    m_splitter = new QSplitter(Qt::Horizontal, central);
+    // Vertical main splitter dividing Top Area (Explorer + Editor + Agent) and Bottom Area (Terminal)
+    m_mainSplitter = new QSplitter(Qt::Vertical, central);
+    m_mainSplitter->setChildrenCollapsible(false);
+
+    // Horizontal splitter dividing Explorer, Editor, and Agent Panel
+    m_splitter = new QSplitter(Qt::Horizontal, m_mainSplitter);
     m_splitter->setChildrenCollapsible(false);
 
     // Explorer Panel on the left
@@ -263,7 +271,19 @@ void MainWindow::setupUi() {
     m_splitter->setSizes({260, 780, 400});
     m_antigravityPanel->hide();
 
-    rootLayout->addWidget(m_splitter);
+    // Terminal Panel on bottom of main splitter
+    m_terminalPanel = new TerminalPanel(m_mainSplitter);
+    connect(m_terminalPanel, &TerminalPanel::closeRequested, this, &MainWindow::onToggleTerminal);
+    connect(m_terminalPanel, &TerminalPanel::toggleTerminalRequested, this, &MainWindow::onToggleTerminal);
+
+    m_mainSplitter->addWidget(m_splitter);
+    m_mainSplitter->addWidget(m_terminalPanel);
+    m_mainSplitter->setStretchFactor(0, 1);
+    m_mainSplitter->setStretchFactor(1, 0);
+    m_mainSplitter->setSizes({520, 200});
+    m_terminalPanel->hide();
+
+    rootLayout->addWidget(m_mainSplitter);
 
     // Status Bar
     auto *status = statusBar();
@@ -309,6 +329,7 @@ void MainWindow::createMenus() {
     auto *viewMenu = menuBar()->addMenu(tr("&View"));
     viewMenu->addAction(tr("Toggle &Sidebar"), QKeySequence(Qt::CTRL | Qt::Key_B), this, &MainWindow::onToggleSidebar);
     viewMenu->addAction(tr("Toggle &Antigravity"), QKeySequence(Qt::CTRL | Qt::Key_L), this, &MainWindow::onToggleAntigravity);
+    viewMenu->addAction(tr("Toggle &Terminal"), QKeySequence(Qt::CTRL | Qt::Key_J), this, &MainWindow::onToggleTerminal);
     viewMenu->addSeparator();
     viewMenu->addAction(tr("Zoom &In"), QKeySequence::ZoomIn, this, [this]() {
         m_editor->setEditorFontSize(m_editor->editorFontSize() + 1);
@@ -318,6 +339,18 @@ void MainWindow::createMenus() {
     });
     viewMenu->addAction(tr("&Reset Zoom"), QKeySequence(Qt::CTRL | Qt::Key_0), this, [this]() {
         m_editor->resetEditorFontSize();
+    });
+
+    // --- Terminal Menu ---
+    auto *terminalMenu = menuBar()->addMenu(tr("&Terminal"));
+    terminalMenu->addAction(tr("&New Terminal"), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T), this, &MainWindow::onNewTerminalTab);
+    terminalMenu->addAction(tr("Toggle &Terminal"), QKeySequence(Qt::CTRL | Qt::Key_J), this, &MainWindow::onToggleTerminal);
+    terminalMenu->addSeparator();
+    terminalMenu->addAction(tr("&Clear Terminal"), this, [this]() {
+        if (m_terminalPanel) m_terminalPanel->onClearTerminalClicked();
+    });
+    terminalMenu->addAction(tr("&Kill Terminal Session"), this, [this]() {
+        if (m_terminalPanel) m_terminalPanel->onKillTerminalClicked();
     });
 
     // --- Help Menu ---
@@ -333,6 +366,11 @@ void MainWindow::createShortcuts() {
     new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), this, [this]() {
         m_editor->setEditorFontSize(m_editor->editorFontSize() + 1);
     });
+
+    // Terminal shortcuts
+    new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_QuoteLeft), this, [this]() { onToggleTerminal(); });
+    new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_AsciiTilde), this, [this]() { onToggleTerminal(); });
+    new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T), this, [this]() { onNewTerminalTab(); });
 }
 
 void MainWindow::updateTitleAndHeader() {
@@ -490,6 +528,9 @@ void MainWindow::onOpenFolder() {
 
 void MainWindow::openFolder(const QString &folderPath) {
     m_explorerPanel->setRootFolder(folderPath);
+    if (m_terminalPanel) {
+        m_terminalPanel->setWorkingDir(folderPath);
+    }
     m_statusMsgLabel->setText(tr("Opened folder: %1").arg(QDir(folderPath).dirName()));
 }
 
@@ -597,6 +638,32 @@ void MainWindow::onToggleAntigravity() {
     }
 }
 
+void MainWindow::onToggleTerminal() {
+    if (!m_terminalPanel) return;
+    const bool show = !m_terminalPanel->isVisible();
+    m_terminalPanel->setVisible(show);
+    if (show) {
+        if (m_terminalPanel->currentTerminal() == nullptr) {
+            m_terminalPanel->addTerminalTab(m_explorerPanel->currentFolderPath());
+        } else {
+            m_terminalPanel->currentTerminal()->setFocus();
+        }
+        if (m_mainSplitter->sizes().value(1, 0) < 100) {
+            m_mainSplitter->setSizes({500, 200});
+        }
+    } else {
+        m_editor->setFocus();
+    }
+}
+
+void MainWindow::onNewTerminalTab() {
+    if (!m_terminalPanel) return;
+    if (!m_terminalPanel->isVisible()) {
+        m_terminalPanel->show();
+    }
+    m_terminalPanel->addTerminalTab(m_explorerPanel->currentFolderPath());
+}
+
 void MainWindow::reloadFileFromDisk(const QString &filePath) {
     if (m_isUntitled || m_currentFilePath != filePath) {
         return;
@@ -685,7 +752,7 @@ void MainWindow::onAbout() {
     msgBox.setIconPixmap(Icons::orbit(48).pixmap(48, 48));
     msgBox.setText(tr("<h3>Orbit 0.1.0</h3>"
                       "<p>A fast, focused, and elegant native code and text editor built with C++20 and Qt 6.</p>"
-                      "<p>Includes native Google Antigravity support via the Agent Client Protocol.</p>"));
+                      "<p>Includes native Google Antigravity support via the Agent Client Protocol and an integrated terminal.</p>"));
     auto *okBtn = msgBox.addButton(tr("OK"), QMessageBox::AcceptRole);
     okBtn->setIcon(QIcon());
     msgBox.exec();
@@ -699,9 +766,19 @@ void MainWindow::loadSettings() {
         restoreGeometry(geometry);
     }
 
+    const QByteArray mainSplitterState = settings.value("mainSplitterSizes").toByteArray();
+    if (!mainSplitterState.isEmpty() && m_mainSplitter) {
+        m_mainSplitter->restoreState(mainSplitterState);
+    }
+
     const QByteArray splitterState = settings.value("splitterSizes").toByteArray();
     if (!splitterState.isEmpty()) {
         m_splitter->restoreState(splitterState);
+    }
+
+    const bool termVisible = settings.value("terminalVisible", false).toBool();
+    if (termVisible && m_terminalPanel) {
+        onToggleTerminal();
     }
 
     const QString lastFolder = settings.value("lastFolder").toString();
@@ -718,7 +795,13 @@ void MainWindow::loadSettings() {
 void MainWindow::saveSettings() {
     QSettings settings("OrbitEditor", "Orbit");
     settings.setValue("geometry", saveGeometry());
+    if (m_mainSplitter) {
+        settings.setValue("mainSplitterSizes", m_mainSplitter->saveState());
+    }
     settings.setValue("splitterSizes", m_splitter->saveState());
+    if (m_terminalPanel) {
+        settings.setValue("terminalVisible", m_terminalPanel->isVisible());
+    }
 
     if (!m_explorerPanel->currentFolderPath().isEmpty()) {
         settings.setValue("lastFolder", m_explorerPanel->currentFolderPath());

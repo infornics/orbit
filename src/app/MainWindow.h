@@ -15,6 +15,7 @@ namespace Orbit {
 class ExplorerPanel;
 class CodeEditor;
 class AntigravityPanel;
+class TerminalPanel;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -40,6 +41,8 @@ private slots:
     void onAutoSaveTimeout();
     void onToggleSidebar();
     void onToggleAntigravity();
+    void onToggleTerminal();
+    void onNewTerminalTab();
     void onAbout();
     void reloadFileFromDisk(const QString &filePath);
 
@@ -58,7 +61,8 @@ private:
     void saveSettings();
 
     // UI Widgets
-    QSplitter *m_splitter;
+    QSplitter *m_mainSplitter;      // Vertical splitter (Top: Editor/Explorer/Agent, Bottom: Terminal)
+    QSplitter *m_splitter;          // Horizontal splitter (Left: Explorer, Mid: Editor, Right: Agent)
     ExplorerPanel *m_explorerPanel;
     QWidget *m_editorContainer;
     QWidget *m_fileHeaderBar;
@@ -69,6 +73,7 @@ private:
     QWidget *m_welcomeWidget;
     CodeEditor *m_editor;
     AntigravityPanel *m_antigravityPanel;
+    TerminalPanel *m_terminalPanel;
 
     // Status bar labels
     QLabel *m_statusMsgLabel;

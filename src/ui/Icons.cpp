@@ -258,4 +258,28 @@ QIcon Icons::antigravity(int size, const QColor &color) {
     return QIcon(pixmap);
 }
 
+QIcon Icons::terminal(int size, const QColor &color) {
+    QPixmap pixmap(size, size);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    QPen pen(color, qMax(1.4, size * 0.10));
+    pen.setCapStyle(Qt::RoundCap);
+    pen.setJoinStyle(Qt::RoundJoin);
+    painter.setPen(pen);
+
+    // Prompt prompt >
+    QPainterPath prompt;
+    prompt.moveTo(size * 0.18, size * 0.28);
+    prompt.lineTo(size * 0.44, size * 0.50);
+    prompt.lineTo(size * 0.18, size * 0.72);
+    painter.drawPath(prompt);
+
+    // Underscore cursor _
+    painter.drawLine(QPointF(size * 0.52, size * 0.72), QPointF(size * 0.82, size * 0.72));
+
+    return QIcon(pixmap);
+}
+
 } // namespace Orbit

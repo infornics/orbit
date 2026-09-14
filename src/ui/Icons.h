@@ -17,6 +17,7 @@ public:
     static QIcon plus(int size = 16, const QColor &color = QColor(0x9d, 0xa2, 0xb0));
     static QIcon check(int size = 14, const QColor &color = QColor(0x4f, 0x8c, 0xf6));
     static QIcon antigravity(int size = 16, const QColor &color = QColor(0x4f, 0x8c, 0xf6));
+    static QIcon terminal(int size = 16, const QColor &color = QColor(0x4f, 0x8c, 0xf6));
 };
 
 } // namespace Orbit
