@@ -3,6 +3,7 @@
 #include <QPlainTextEdit>
 #include <QColor>
 #include <QTextCharFormat>
+#include <QTextBlockFormat>
 
 namespace Orbit {
 
@@ -34,15 +35,32 @@ protected:
     void wheelEvent(QWheelEvent *event) override;
 
 private:
+    enum ParserState {
+        STATE_NORMAL,
+        STATE_ESC,
+        STATE_CSI,
+        STATE_OSC,
+        STATE_CHARSET
+    };
+
     void processAnsiStream(const QString &text);
     void handleSgrSequence(const QStringList &params);
+    void handleCsiCommand(QChar cmd, const QString &params, QTextCursor &cursor);
+    void handleOscCommand(const QString &oscStr);
     static QColor parseAnsi256Color(int index);
     void updatePtySize();
 
     PtyProcess *m_pty = nullptr;
     QTextCharFormat m_currentFormat;
     QTextCharFormat m_defaultFormat;
-    int m_baseFontSize = 10;
+    QTextBlockFormat m_blockFormat;
+
+    ParserState m_parserState = STATE_NORMAL;
+    QString m_paramBuffer;
+    QString m_oscBuffer;
+
+    int m_savedBlock = -1;
+    int m_savedCol = -1;
 };
 
 } // namespace Orbit

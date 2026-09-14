@@ -325,11 +325,15 @@ void MainWindow::createMenus() {
 
     fileMenu->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
 
+    auto *toggleTermAction = new QAction(tr("Toggle &Terminal"), this);
+    toggleTermAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
+    connect(toggleTermAction, &QAction::triggered, this, &MainWindow::onToggleTerminal);
+
     // --- View Menu ---
     auto *viewMenu = menuBar()->addMenu(tr("&View"));
     viewMenu->addAction(tr("Toggle &Sidebar"), QKeySequence(Qt::CTRL | Qt::Key_B), this, &MainWindow::onToggleSidebar);
     viewMenu->addAction(tr("Toggle &Antigravity"), QKeySequence(Qt::CTRL | Qt::Key_L), this, &MainWindow::onToggleAntigravity);
-    viewMenu->addAction(tr("Toggle &Terminal"), QKeySequence(Qt::CTRL | Qt::Key_J), this, &MainWindow::onToggleTerminal);
+    viewMenu->addAction(toggleTermAction);
     viewMenu->addSeparator();
     viewMenu->addAction(tr("Zoom &In"), QKeySequence::ZoomIn, this, [this]() {
         m_editor->setEditorFontSize(m_editor->editorFontSize() + 1);
@@ -344,7 +348,7 @@ void MainWindow::createMenus() {
     // --- Terminal Menu ---
     auto *terminalMenu = menuBar()->addMenu(tr("&Terminal"));
     terminalMenu->addAction(tr("&New Terminal"), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T), this, &MainWindow::onNewTerminalTab);
-    terminalMenu->addAction(tr("Toggle &Terminal"), QKeySequence(Qt::CTRL | Qt::Key_J), this, &MainWindow::onToggleTerminal);
+    terminalMenu->addAction(toggleTermAction);
     terminalMenu->addSeparator();
     terminalMenu->addAction(tr("&Clear Terminal"), this, [this]() {
         if (m_terminalPanel) m_terminalPanel->onClearTerminalClicked();

@@ -9,7 +9,7 @@
 #include <QGuiApplication>
 #include <QClipboard>
 #include <QFontDatabase>
-#include <QRegularExpression>
+#include <QTextBlock>
 #include <QDebug>
 
 namespace Orbit {
@@ -23,7 +23,7 @@ static const QColor s_ansi16[16] = {
     QColor("#c084fc"), // 5 Magenta
     QColor("#38bdf8"), // 6 Cyan
     QColor("#e4e4e7"), // 7 White
-    QColor("#71717a"), // 8 Bright Black
+    QColor("#71717a"), // 8 Bright Black / Gray
     QColor("#fca5a5"), // 9 Bright Red
     QColor("#86efac"), // 10 Bright Green
     QColor("#fde047"), // 11 Bright Yellow
@@ -36,26 +36,43 @@ static const QColor s_ansi16[16] = {
 TerminalWidget::TerminalWidget(QWidget *parent)
     : QPlainTextEdit(parent) {
     setObjectName("TerminalWidget");
-    setReadOnly(true); // Terminal handles input via keyPressEvent
+    setReadOnly(true);
     setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
-    setMaximumBlockCount(5000); // Prevent infinite scroll memory buffer leak
+    setMaximumBlockCount(4000);
+    setCenterOnScroll(false);
 
-    // Fixed width font for terminal
-    QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    font.setFamily("JetBrains Mono, Fira Code, DejaVu Sans Mono, Consolas, monospace");
-    font.setPointSizeF(10.0);
+    QFont font("JetBrains Mono", 10);
     font.setStyleHint(QFont::Monospace);
+    font.setFamilies({"JetBrains Mono", "Fira Code", "Cascadia Code", "DejaVu Sans Mono", "Monaco", "Consolas", "monospace"});
     setFont(font);
 
-    // Dark terminal palette
     setStyleSheet(R"(
         QPlainTextEdit#TerminalWidget {
-            background-color: #121215;
+            background-color: #0d0d11;
             color: #d4d4d8;
             border: none;
-            selection-background-color: #272730;
+            selection-background-color: #272738;
             selection-color: #ffffff;
-            padding: 4px;
+            padding: 8px;
+        }
+        QScrollBar:vertical {
+            background: #0d0d11;
+            width: 8px;
+            margin: 0px;
+        }
+        QScrollBar::handle:vertical {
+            background: #272732;
+            min-height: 16px;
+            border-radius: 4px;
+        }
+        QScrollBar::handle:vertical:hover {
+            background: #3f3f50;
+        }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+            height: 0px;
+        }
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+            background: none;
         }
     )");
 
@@ -79,13 +96,15 @@ void TerminalWidget::appendData(const QByteArray &data) {
     QString text = QString::fromUtf8(data);
     processAnsiStream(text);
 
-    // Auto-scroll to bottom
     verticalScrollBar()->setValue(verticalScrollBar()->maximum());
 }
 
 void TerminalWidget::clearTerminal() {
     clear();
     m_currentFormat = m_defaultFormat;
+    m_parserState = STATE_NORMAL;
+    m_paramBuffer.clear();
+    m_oscBuffer.clear();
 }
 
 void TerminalWidget::zoomInFont(int range) {
@@ -113,20 +132,20 @@ void TerminalWidget::keyPressEvent(QKeyEvent *event) {
     int key = event->key();
     Qt::KeyboardModifiers mods = event->modifiers();
 
-    // Check toggle shortcuts (Ctrl+~ or Ctrl+J) -> let parent window handle
+    // Toggle shortcuts (Ctrl+~ or Ctrl+J) -> emit signal to parent
     if ((mods == Qt::ControlModifier && (key == Qt::Key_AsciiTilde || key == Qt::Key_QuoteLeft || key == Qt::Key_J))) {
         event->ignore();
         emit toggleTerminalRequested();
         return;
     }
 
-    // Ctrl+Shift+C -> Copy selection
+    // Ctrl+Shift+C -> Copy text selection
     if (mods == (Qt::ControlModifier | Qt::ShiftModifier) && key == Qt::Key_C) {
         copy();
         return;
     }
 
-    // Ctrl+Shift+V -> Paste clipboard
+    // Ctrl+Shift+V -> Paste clipboard text to PTY
     if (mods == (Qt::ControlModifier | Qt::ShiftModifier) && key == Qt::Key_V) {
         if (m_pty) {
             QString clipText = QGuiApplication::clipboard()->text();
@@ -137,7 +156,7 @@ void TerminalWidget::keyPressEvent(QKeyEvent *event) {
         return;
     }
 
-    // Ctrl+Plus / Ctrl+Minus -> Zoom terminal font
+    // Ctrl+Plus / Ctrl+Minus -> Zoom font
     if (mods & Qt::ControlModifier) {
         if (key == Qt::Key_Plus || key == Qt::Key_Equal) {
             zoomInFont();
@@ -246,8 +265,8 @@ void TerminalWidget::updatePtySize() {
     int charHeight = fontMetrics().height();
 
     if (charWidth > 0 && charHeight > 0) {
-        int cols = qMax(10, (width() - 10) / charWidth);
-        int rows = qMax(3, (height() - 10) / charHeight);
+        int cols = qMax(10, (width() - 16) / charWidth);
+        int rows = qMax(3, (height() - 16) / charHeight);
         m_pty->resizePty(rows, cols);
     }
 }
@@ -280,39 +299,39 @@ void TerminalWidget::handleSgrSequence(const QStringList &params) {
 
     for (int i = 0; i < params.size(); ++i) {
         int code = params[i].toInt();
-        if (code == 0) { // Reset
+        if (code == 0) {
             m_currentFormat = m_defaultFormat;
-        } else if (code == 1) { // Bold
+        } else if (code == 1) {
             m_currentFormat.setFontWeight(QFont::Bold);
-        } else if (code == 4) { // Underline
+        } else if (code == 4) {
             m_currentFormat.setFontUnderline(true);
-        } else if (code == 22) { // Normal weight
+        } else if (code == 22) {
             m_currentFormat.setFontWeight(QFont::Normal);
-        } else if (code == 24) { // Underline off
+        } else if (code == 24) {
             m_currentFormat.setFontUnderline(false);
-        } else if (code >= 30 && code <= 37) { // FG 8 colors
+        } else if (code >= 30 && code <= 37) {
             m_currentFormat.setForeground(s_ansi16[code - 30]);
-        } else if (code == 39) { // Default FG
+        } else if (code == 39) {
             m_currentFormat.setForeground(m_defaultFormat.foreground());
-        } else if (code >= 40 && code <= 47) { // BG 8 colors
+        } else if (code >= 40 && code <= 47) {
             m_currentFormat.setBackground(s_ansi16[code - 40]);
-        } else if (code == 49) { // Default BG
+        } else if (code == 49) {
             m_currentFormat.setBackground(m_defaultFormat.background());
-        } else if (code >= 90 && code <= 97) { // Bright FG
+        } else if (code >= 90 && code <= 97) {
             m_currentFormat.setForeground(s_ansi16[code - 90 + 8]);
-        } else if (code >= 100 && code <= 107) { // Bright BG
+        } else if (code >= 100 && code <= 107) {
             m_currentFormat.setBackground(s_ansi16[code - 100 + 8]);
-        } else if (code == 38 || code == 48) { // 256 / TrueColor FG or BG
+        } else if (code == 38 || code == 48) {
             bool isFg = (code == 38);
             if (i + 1 < params.size()) {
                 int mode = params[i + 1].toInt();
-                if (mode == 5 && i + 2 < params.size()) { // 256 color
+                if (mode == 5 && i + 2 < params.size()) {
                     int colorIdx = params[i + 2].toInt();
                     QColor col = parseAnsi256Color(colorIdx);
                     if (isFg) m_currentFormat.setForeground(col);
                     else m_currentFormat.setBackground(col);
                     i += 2;
-                } else if (mode == 2 && i + 4 < params.size()) { // RGB TrueColor
+                } else if (mode == 2 && i + 4 < params.size()) {
                     int r = params[i + 2].toInt();
                     int g = params[i + 3].toInt();
                     int b = params[i + 4].toInt();
@@ -326,76 +345,214 @@ void TerminalWidget::handleSgrSequence(const QStringList &params) {
     }
 }
 
+void TerminalWidget::handleOscCommand(const QString &oscStr) {
+    Q_UNUSED(oscStr);
+    // OSC sequences like set window title \033]0;title\007 are safely consumed and stripped.
+}
+
+void TerminalWidget::handleCsiCommand(QChar cmd, const QString &params, QTextCursor &cursor) {
+    QStringList pList = params.split(';');
+
+    auto getParam = [&pList](int idx, int defVal) -> int {
+        if (idx < pList.size() && !pList[idx].isEmpty()) {
+            bool ok = false;
+            int v = pList[idx].toInt(&ok);
+            if (ok) return v;
+        }
+        return defVal;
+    };
+
+    if (cmd == 'm') {
+        handleSgrSequence(pList);
+    } else if (cmd == 'K') {
+        // Erase in line
+        int mode = getParam(0, 0);
+        if (mode == 0) {
+            // Erase from cursor to end of line
+            cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+            cursor.removeSelectedText();
+        } else if (mode == 1) {
+            // Erase from start of line to cursor
+            cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::KeepAnchor);
+            cursor.removeSelectedText();
+        } else if (mode == 2) {
+            // Erase entire line
+            cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::MoveAnchor);
+            cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+            cursor.removeSelectedText();
+        }
+    } else if (cmd == 'J') {
+        // Erase in display
+        int mode = getParam(0, 0);
+        if (mode == 2 || mode == 3) {
+            clearTerminal();
+            cursor = textCursor();
+        } else if (mode == 0) {
+            cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
+            cursor.removeSelectedText();
+        }
+    } else if (cmd == 'A') {
+        // Cursor Up
+        int count = getParam(0, 1);
+        cursor.movePosition(QTextCursor::Up, QTextCursor::MoveAnchor, count);
+    } else if (cmd == 'B') {
+        // Cursor Down
+        int count = getParam(0, 1);
+        cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, count);
+    } else if (cmd == 'C') {
+        // Cursor Right
+        int count = getParam(0, 1);
+        cursor.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, count);
+    } else if (cmd == 'D') {
+        // Cursor Left
+        int count = getParam(0, 1);
+        cursor.movePosition(QTextCursor::Left, QTextCursor::MoveAnchor, count);
+    } else if (cmd == 'G' || cmd == '`') {
+        // Cursor Column
+        int col = getParam(0, 1);
+        cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::MoveAnchor);
+        if (col > 1) {
+            cursor.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, col - 1);
+        }
+    } else if (cmd == 'H' || cmd == 'f') {
+        // Cursor Position row;col
+        int row = getParam(0, 1);
+        int col = getParam(1, 1);
+        cursor.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor);
+        for (int r = 1; r < row; ++r) {
+            cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor);
+        }
+        if (col > 1) {
+            cursor.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, col - 1);
+        }
+    } else if (cmd == 'P') {
+        // Delete characters
+        int count = getParam(0, 1);
+        cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, count);
+        cursor.removeSelectedText();
+    } else if (cmd == 'X') {
+        // Erase characters (overwrite with spaces)
+        int count = getParam(0, 1);
+        for (int i = 0; i < count; ++i) {
+            if (!cursor.atBlockEnd()) {
+                cursor.deleteChar();
+            }
+            cursor.setCharFormat(m_currentFormat);
+            cursor.insertText(" ");
+        }
+    }
+}
+
 void TerminalWidget::processAnsiStream(const QString &text) {
     QTextCursor cursor = textCursor();
-    cursor.movePosition(QTextCursor::End);
+    // Ensure we start cursor at end if we were at end previously
+    if (verticalScrollBar()->value() >= verticalScrollBar()->maximum() - 5) {
+        cursor.movePosition(QTextCursor::End, QTextCursor::MoveAnchor);
+    }
 
-    int pos = 0;
-    int len = text.length();
+    for (int i = 0; i < text.length(); ++i) {
+        QChar ch = text[i];
 
-    while (pos < len) {
-        QChar ch = text[pos];
-
-        if (ch == '\x1b') {
-            // Escape sequence start
-            if (pos + 1 < len && text[pos + 1] == '[') {
-                // CSI sequence \033[ ... [letter]
-                int endPos = pos + 2;
-                while (endPos < len && (text[endPos].isDigit() || text[endPos] == ';' || text[endPos] == '?')) {
-                    endPos++;
-                }
-                if (endPos < len) {
-                    QChar cmd = text[endPos];
-                    QString seqParam = text.mid(pos + 2, endPos - (pos + 2));
-
-                    if (cmd == 'm') {
-                        // SGR sequence
-                        handleSgrSequence(seqParam.split(';'));
-                    } else if (cmd == 'J' && (seqParam == "2" || seqParam == "3")) {
-                        // Clear screen
-                        clearTerminal();
-                        cursor = textCursor();
-                    } else if (cmd == 'K') {
-                        // Erase in line - ignore for basic display
-                    }
-                    pos = endPos + 1;
-                    continue;
-                }
-            }
-            pos++;
-            continue;
-        }
-
-        if (ch == '\r') {
-            // Carriage return - if next character is not '\n', move cursor to line start
-            if (pos + 1 < len && text[pos + 1] == '\n') {
-                // Handled in next iteration as newline
-            } else {
+        switch (m_parserState) {
+        case STATE_NORMAL:
+            if (ch == '\x1b') {
+                m_parserState = STATE_ESC;
+                m_paramBuffer.clear();
+            } else if (ch == '\r') {
+                // Carriage Return: move cursor to start of current block (line)
                 cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::MoveAnchor);
+            } else if (ch == '\n') {
+                // Line Feed: move cursor to end of current line and insert new line block
+                cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::MoveAnchor);
+                cursor.insertBlock(m_blockFormat, m_currentFormat);
+            } else if (ch == '\b') {
+                // Backspace character: move cursor left 1 char
+                if (!cursor.atBlockStart()) {
+                    cursor.movePosition(QTextCursor::Left, QTextCursor::MoveAnchor);
+                }
+            } else if (ch == '\t') {
+                // Tab character: move to next 4-space tab stop
+                int currentCol = cursor.positionInBlock();
+                int spacesToAdd = 4 - (currentCol % 4);
+                for (int s = 0; s < spacesToAdd; ++s) {
+                    if (!cursor.atBlockEnd()) {
+                        cursor.deleteChar();
+                    }
+                    cursor.setCharFormat(m_currentFormat);
+                    cursor.insertText(" ");
+                }
+            } else if (ch == '\a') {
+                // Bell - ignore
+            } else {
+                // Normal printable character
+                // If cursor is not at end of line (in readline overwrite state), overwrite character
+                if (!cursor.atBlockEnd()) {
+                    cursor.deleteChar();
+                }
+                cursor.setCharFormat(m_currentFormat);
+                cursor.insertText(QString(ch));
             }
-            pos++;
-            continue;
-        }
+            break;
 
-        if (ch == '\b') {
-            // Backspace character
-            if (!cursor.atBlockStart()) {
-                cursor.deletePreviousChar();
+        case STATE_ESC:
+            if (ch == '[') {
+                m_parserState = STATE_CSI;
+                m_paramBuffer.clear();
+            } else if (ch == ']') {
+                m_parserState = STATE_OSC;
+                m_oscBuffer.clear();
+            } else if (ch == '(' || ch == ')' || ch == '#' || ch == '%') {
+                m_parserState = STATE_CHARSET;
+            } else if (ch == '7') {
+                m_savedBlock = cursor.blockNumber();
+                m_savedCol = cursor.positionInBlock();
+                m_parserState = STATE_NORMAL;
+            } else if (ch == '8') {
+                m_parserState = STATE_NORMAL;
+            } else {
+                m_parserState = STATE_NORMAL;
             }
-            pos++;
-            continue;
-        }
+            break;
 
-        if (ch == '\a') {
-            // Bell - ignore
-            pos++;
-            continue;
-        }
+        case STATE_CHARSET:
+            // Consume designation character (e.g., 'B' for ASCII) and return to normal
+            m_parserState = STATE_NORMAL;
+            break;
 
-        // Standard printable character or \n
-        cursor.setCharFormat(m_currentFormat);
-        cursor.insertText(QString(ch));
-        pos++;
+        case STATE_OSC:
+            if (ch == '\a') {
+                handleOscCommand(m_oscBuffer);
+                m_parserState = STATE_NORMAL;
+                m_oscBuffer.clear();
+            } else if (ch == '\\' && m_oscBuffer.endsWith('\x1b')) {
+                m_oscBuffer.chop(1);
+                handleOscCommand(m_oscBuffer);
+                m_parserState = STATE_NORMAL;
+                m_oscBuffer.clear();
+            } else {
+                m_oscBuffer.append(ch);
+            }
+            break;
+
+        case STATE_CSI: {
+            ushort u = ch.unicode();
+            if ((u >= '0' && u <= '9') || ch == ';' || ch == '?' || ch == '>' || ch == '!' || ch == ' ') {
+                m_paramBuffer.append(ch);
+            } else if (u >= 0x40 && u <= 0x7E) {
+                // CSI Command execution
+                handleCsiCommand(ch, m_paramBuffer, cursor);
+                m_parserState = STATE_NORMAL;
+                m_paramBuffer.clear();
+            } else if (ch == '\x1b') {
+                m_parserState = STATE_ESC;
+                m_paramBuffer.clear();
+            } else {
+                m_parserState = STATE_NORMAL;
+                m_paramBuffer.clear();
+            }
+            break;
+        }
+        }
     }
 
     setTextCursor(cursor);

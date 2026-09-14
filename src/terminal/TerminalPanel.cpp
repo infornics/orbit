@@ -29,12 +29,12 @@ void TerminalPanel::setupUi() {
 
     // Header toolbar bar
     auto *headerBar = new QWidget(this);
-    headerBar->setFixedHeight(32);
+    headerBar->setFixedHeight(34);
     headerBar->setStyleSheet(R"(
         QWidget {
-            background-color: #1a1a20;
-            border-top: 1px solid #282832;
-            border-bottom: 1px solid #24242c;
+            background-color: #16161b;
+            border-top: 1px solid #282834;
+            border-bottom: 1px solid #1f1f28;
         }
     )");
 
@@ -48,30 +48,32 @@ void TerminalPanel::setupUi() {
     m_tabBar->setMovable(true);
     m_tabBar->setDrawBase(false);
     m_tabBar->setStyleSheet(R"(
+        QTabBar {
+            background: transparent;
+            border: none;
+        }
         QTabBar::tab {
-            background: #1e1e24;
-            color: #8e8e9a;
-            border: 1px solid #282832;
+            background: #1c1c22;
+            color: #9494a0;
+            border: 1px solid #282834;
             border-bottom: none;
-            padding: 4px 10px;
+            padding: 4px 12px;
             font-size: 11px;
             font-weight: 500;
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
-            margin-right: 2px;
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
+            margin-right: 3px;
+            margin-top: 3px;
         }
         QTabBar::tab:selected {
-            background: #121215;
+            background: #0d0d11;
             color: #4f8cf6;
-            border-color: #4f8cf6;
+            border: 1px solid #4f8cf6;
+            font-weight: 600;
         }
         QTabBar::tab:hover:!selected {
-            background: #25252e;
-            color: #d4d4d8;
-        }
-        QTabBar::close-button {
-            image: none;
-            subcontrol-position: right;
+            background: #24242c;
+            color: #e4e4e7;
         }
     )");
 
@@ -83,18 +85,19 @@ void TerminalPanel::setupUi() {
         QPushButton {
             background: transparent;
             color: #a0a0b0;
-            border: none;
-            border-radius: 3px;
-            padding: 2px 6px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 3px 8px;
             font-size: 11px;
             font-weight: 500;
         }
         QPushButton:hover {
-            background-color: #282834;
+            background-color: #242430;
             color: #ffffff;
+            border-color: #323242;
         }
         QPushButton:pressed {
-            background-color: #323240;
+            background-color: #2c2c3c;
         }
     )";
 
@@ -120,10 +123,10 @@ void TerminalPanel::setupUi() {
             background: transparent;
             color: #71717a;
             border: none;
-            border-radius: 3px;
+            border-radius: 4px;
             font-size: 12px;
             font-weight: bold;
-            padding: 2px 6px;
+            padding: 2px 8px;
         }
         QPushButton:hover {
             background-color: #ef4444;
